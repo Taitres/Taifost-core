@@ -82,6 +82,42 @@ describe('MarlinWorkflowService', () => {
     expect(result.request).not.toHaveProperty('passcodeHash')
   })
 
+  it('generates a one-time passcode when the compose environment is empty', async () => {
+    const previousPasscode = process.env.MARLIN_REVIEW_PASSCODE
+    process.env.MARLIN_REVIEW_PASSCODE = ''
+    const { repository, service } = createService()
+    repository.findProject.mockResolvedValue({
+      id: 'project-1',
+      currentRevisionId: 'revision-1',
+    })
+    repository.createReviewRequest.mockImplementation(async (input) => ({
+      request: {
+        id: 'review-1',
+        projectId: input.projectId,
+        revisionId: input.revisionId,
+        passcodeHash: input.passcodeHash,
+        expiresAt: input.expiresAt,
+        status: 'pending',
+      },
+      revision: { id: input.revisionId },
+    }))
+
+    try {
+      const result = await service.requestReview('project-1', {
+        expiresInHours: 24,
+      })
+
+      expect(result.passcode).toMatch(/^\d{6}$/)
+      expect(result.passcodeConfigured).toBe(false)
+    } finally {
+      if (previousPasscode === undefined) {
+        delete process.env.MARLIN_REVIEW_PASSCODE
+      } else {
+        process.env.MARLIN_REVIEW_PASSCODE = previousPasscode
+      }
+    }
+  })
+
   it('emails the external reviewer and records delivery status', async () => {
     const { configsService, emailService, repository, service } =
       createService()

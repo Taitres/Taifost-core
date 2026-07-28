@@ -110,7 +110,7 @@ export class MarlinWorkflowService {
       )
     }
     const passcode =
-      configuredPasscode ?? randomInt(0, 1_000_000).toString().padStart(6, '0')
+      configuredPasscode || randomInt(0, 1_000_000).toString().padStart(6, '0')
     const result = await this.repository.createReviewRequest({
       projectId,
       revisionId,
