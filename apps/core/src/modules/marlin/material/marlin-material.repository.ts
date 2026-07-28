@@ -2,7 +2,12 @@ import { Inject, Injectable } from '@nestjs/common'
 import { and, desc, eq, ilike, type SQL, sql } from 'drizzle-orm'
 
 import { PG_DB_TOKEN } from '~/constants/system.constant'
-import { marlinMaterialImports, marlinMaterials } from '~/database/schema'
+import {
+  marlinMaterialImports,
+  marlinMaterials,
+  pages,
+  posts,
+} from '~/database/schema'
 import {
   BaseRepository,
   type PaginationResult,
@@ -122,6 +127,102 @@ export class MarlinMaterialRepository extends BaseRepository {
       .orderBy(desc(marlinMaterialImports.createdAt))
 
     return { ...material, imports }
+  }
+
+  async listMedia() {
+    const [materials, postContents, pageContents] = await Promise.all([
+      this.db
+        .select({
+          id: marlinMaterials.id,
+          title: marlinMaterials.title,
+          analysis: marlinMaterials.analysis,
+        })
+        .from(marlinMaterials)
+        .where(sql`${marlinMaterials.analysis} is not null`),
+      this.db
+        .select({ id: posts.id, title: posts.title, text: posts.text })
+        .from(posts),
+      this.db
+        .select({ id: pages.id, title: pages.title, text: pages.text })
+        .from(pages),
+    ])
+    const publishedContents = [
+      ...postContents.map((item) => ({ ...item, type: 'post' as const })),
+      ...pageContents.map((item) => ({ ...item, type: 'page' as const })),
+    ]
+    const assets = new Map<
+      string,
+      {
+        sourceUrl: string
+        archivedUrl?: string
+        objectPath?: string
+        contentHash?: string
+        mimeType?: string
+        byteSize?: number
+        status: string
+        error?: string
+        materials: Array<{ id: string; title: string }>
+      }
+    >()
+
+    for (const material of materials) {
+      const analysis = material.analysis as {
+        media?: Array<Record<string, unknown>>
+      } | null
+      for (const media of analysis?.media ?? []) {
+        const sourceUrl = String(media.sourceUrl ?? media.source_url ?? '')
+        const archivedUrl = media.archivedUrl ?? media.archived_url
+        if (!sourceUrl) continue
+        const key = String(archivedUrl || sourceUrl)
+        const existing = assets.get(key)
+        if (existing) {
+          existing.materials.push({ id: material.id, title: material.title })
+          continue
+        }
+        assets.set(key, {
+          sourceUrl,
+          archivedUrl:
+            typeof archivedUrl === 'string' ? archivedUrl : undefined,
+          objectPath:
+            typeof (media.objectPath ?? media.object_path) === 'string'
+              ? String(media.objectPath ?? media.object_path)
+              : undefined,
+          contentHash:
+            typeof (media.contentHash ?? media.content_hash) === 'string'
+              ? String(media.contentHash ?? media.content_hash)
+              : undefined,
+          mimeType:
+            typeof (media.mimeType ?? media.mime_type) === 'string'
+              ? String(media.mimeType ?? media.mime_type)
+              : undefined,
+          byteSize:
+            typeof (media.byteSize ?? media.byte_size) === 'number'
+              ? Number(media.byteSize ?? media.byte_size)
+              : undefined,
+          status: String(media.status ?? 'pending'),
+          error: typeof media.error === 'string' ? media.error : undefined,
+          materials: [{ id: material.id, title: material.title }],
+        })
+      }
+    }
+
+    return [...assets.values()].map((asset) => {
+      const usedBy = asset.archivedUrl
+        ? publishedContents
+            .filter(({ text }) => text?.includes(asset.archivedUrl!))
+            .map(({ id, title, type }) => ({ id, title, type }))
+        : []
+      return {
+        ...asset,
+        usage:
+          asset.status !== 'archived'
+            ? 'unresolved'
+            : usedBy.length
+              ? 'used'
+              : 'unused',
+        usedBy,
+      }
+    })
   }
 
   async archive(id: string) {

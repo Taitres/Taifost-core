@@ -50,6 +50,11 @@ export class MarlinMaterialController {
     )
   }
 
+  @Get('/media')
+  listMedia() {
+    return this.repository.listMedia()
+  }
+
   @Get('/:id')
   async get(@Param() { id }: EntityIdDto) {
     const material = await this.repository.findById(id)
