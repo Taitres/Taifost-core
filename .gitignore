@@ -44,6 +44,7 @@ run
 # anchored to repo root: these are the server's runtime dirs, not nested
 # source dirs of the same name (e.g. apps/admin/src/ui/data, .../assets)
 /data
+/data-marlin
 /assets
 .env
 
