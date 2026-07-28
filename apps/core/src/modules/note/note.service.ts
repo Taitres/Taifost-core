@@ -248,7 +248,7 @@ export class NoteService {
 
   async getLatestNoteId() {
     const note = await this.noteRepository.getLatestVisible()
-    if (!note) throw createAppException(AppErrorCode.NOT_FOUND)
+    if (!note) return null
     return { nid: note.nid, id: note.id }
   }
 

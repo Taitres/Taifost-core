@@ -84,6 +84,23 @@ const createService = () => {
 }
 
 describe('NoteService', () => {
+  it('returns null for the latest note on a new site', async () => {
+    const { repository, service } = createService()
+    repository.getLatestVisible.mockResolvedValue(null)
+
+    await expect(service.getLatestNoteId()).resolves.toBeNull()
+  })
+
+  it('returns the public identity of the latest visible note', async () => {
+    const { repository, service } = createService()
+    repository.getLatestVisible.mockResolvedValue(createNote({ nid: 42 }))
+
+    await expect(service.getLatestNoteId()).resolves.toEqual({
+      id: 'note-1',
+      nid: 42,
+    })
+  })
+
   it('creates notes with database-generated nid and normalized slug', async () => {
     const { repository, service } = createService()
     repository.findBySlug.mockResolvedValue(null)

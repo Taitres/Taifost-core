@@ -36,6 +36,7 @@
     "prod:stop": "pm2 stop ecosystem.config.cjs",
     "prod:debug": "cross-env NODE_ENV=production nest start --debug --watch",
     "test": "NODE_ENV=development vitest",
+    "test:unit": "NODE_ENV=development vitest run --config vitest.unit.config.mts",
     "test:watch": "NODE_ENV=development vitest -w",
     "test:live": "NODE_ENV=development RUN_LIVE_TESTS=1 vitest run translation-review-pipeline.live.e2e-spec.ts",
     "test:live:local": "NODE_ENV=development RUN_LIVE_TESTS=1 SMOKE_PROVIDER=openai-compatible vitest run translation-review-pipeline.live.e2e-spec.ts",

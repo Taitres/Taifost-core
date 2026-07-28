@@ -55,6 +55,7 @@ bin/process-reporter
 
 dist
 dev/
+*.tsbuildinfo
 
 .eslintcache
 .superpowers
