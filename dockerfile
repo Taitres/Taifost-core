@@ -1,10 +1,9 @@
-FROM node:24-alpine AS builder
+FROM node:24 AS builder
 ENV MONGOMS_DISABLE_POSTINSTALL=1
 ENV REDISMS_DISABLE_POSTINSTALL=1
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
-RUN apk add --no-cache git make g++ python3
 RUN corepack enable
 RUN corepack prepare --activate
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
