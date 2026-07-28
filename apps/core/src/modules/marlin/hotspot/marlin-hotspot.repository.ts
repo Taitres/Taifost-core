@@ -189,6 +189,15 @@ export class MarlinHotspotRepository extends BaseRepository {
     }
   }
 
+  async findCandidate(id: string) {
+    const [row] = await this.db
+      .select()
+      .from(marlinHotspotCandidates)
+      .where(eq(marlinHotspotCandidates.id, this.toDbId(id)))
+      .limit(1)
+    return row ?? null
+  }
+
   async setCandidateStatus(
     id: string,
     status: 'inbox' | 'selected' | 'dismissed',
@@ -196,6 +205,27 @@ export class MarlinHotspotRepository extends BaseRepository {
     const [row] = await this.db
       .update(marlinHotspotCandidates)
       .set({ status })
+      .where(eq(marlinHotspotCandidates.id, this.toDbId(id)))
+      .returning()
+    return row ?? null
+  }
+
+  async markCandidateSelected(
+    id: string,
+    input: { materialId: string; projectId: string },
+  ) {
+    const candidate = await this.findCandidate(id)
+    if (!candidate) return null
+    const [row] = await this.db
+      .update(marlinHotspotCandidates)
+      .set({
+        status: 'selected',
+        raw: {
+          ...candidate.raw,
+          marlinMaterialId: input.materialId,
+          marlinProjectId: input.projectId,
+        },
+      })
       .where(eq(marlinHotspotCandidates.id, this.toDbId(id)))
       .returning()
     return row ?? null

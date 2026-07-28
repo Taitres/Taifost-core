@@ -97,6 +97,9 @@ export class MarlinHotspotController {
     @Param() { id }: EntityIdDto,
     @Body() body: MarlinHotspotCandidateStatusDto,
   ) {
+    if (body.status === 'selected') {
+      return this.service.selectCandidate(id)
+    }
     const candidate = await this.repository.setCandidateStatus(id, body.status)
     if (!candidate) throw new NotFoundException('Hotspot candidate not found')
     return candidate

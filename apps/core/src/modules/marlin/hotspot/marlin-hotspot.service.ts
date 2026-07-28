@@ -2,10 +2,13 @@ import { createHash } from 'node:crypto'
 
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common'
 
+import { MarlinMaterialService } from '../material/marlin-material.service'
+import { MarlinWorkflowService } from '../workflow/marlin-workflow.service'
 import { parseHotspotPayload } from './marlin-hotspot.parser'
 import { MarlinHotspotRepository } from './marlin-hotspot.repository'
 
@@ -36,12 +39,17 @@ const eventHashOf = (title: string, url?: string) =>
 
 @Injectable()
 export class MarlinHotspotService {
-  constructor(private readonly repository: MarlinHotspotRepository) {}
+  constructor(
+    private readonly repository: MarlinHotspotRepository,
+    private readonly materialService: MarlinMaterialService,
+    private readonly workflowService: MarlinWorkflowService,
+  ) {}
 
   async collect(sourceId: string) {
     const source = await this.repository.findSource(sourceId)
     if (!source) throw new NotFoundException('Hotspot source not found')
-    if (!source.enabled) throw new BadRequestException('Hotspot source disabled')
+    if (!source.enabled)
+      throw new BadRequestException('Hotspot source disabled')
     const theme = source.themeId
       ? await this.repository.findTheme(source.themeId)
       : null
@@ -79,10 +87,7 @@ export class MarlinHotspotService {
         body,
         source.config,
       )
-      const counts = await this.repository.countToday(
-        source.id,
-        source.themeId,
-      )
+      const counts = await this.repository.countToday(source.id, source.themeId)
       const sourceRemaining = Math.max(0, source.dailyQuota - counts.source)
       const themeRemaining = theme
         ? Math.max(0, theme.dailyQuota - counts.theme)
@@ -141,5 +146,75 @@ export class MarlinHotspotService {
       }
     }
     return results
+  }
+
+  async selectCandidate(id: string) {
+    const candidate = await this.repository.findCandidate(id)
+    if (!candidate) throw new NotFoundException('Hotspot candidate not found')
+    if (candidate.status === 'selected') {
+      return {
+        candidate,
+        materialId: candidate.raw.marlinMaterialId ?? null,
+        projectId: candidate.raw.marlinProjectId ?? null,
+        replayed: true,
+      }
+    }
+
+    const imported = candidate.url
+      ? await this.materialService.importUrl({
+          url: candidate.url,
+          title: candidate.title,
+          metadata: {
+            hotspotCandidateId: candidate.id,
+            hotspotSourceId: candidate.sourceId,
+          },
+        })
+      : await this.materialService.import({
+          kind: 'markdown',
+          title: candidate.title,
+          content: [`# ${candidate.title}`, candidate.summary ?? '']
+            .filter(Boolean)
+            .join('\n\n'),
+          mimeType: 'text/markdown',
+          sourceType: 'manual',
+          sourceRef: `hotspot:${candidate.id}`,
+          metadata: {
+            hotspotCandidateId: candidate.id,
+            hotspotSourceId: candidate.sourceId,
+          },
+        })
+    const analysis = await this.materialService.analyze(imported.material.id, {
+      force: false,
+      archiveImages: true,
+    })
+    if (analysis?.material?.status === 'pending') {
+      throw new ConflictException(
+        'Hotspot material has unresolved remote images; resolve it in the material library before selecting again',
+      )
+    }
+
+    const project = await this.workflowService.createProject({
+      title: candidate.title,
+      goal: [
+        '基于入选热点形成一篇可审核的原创文章。',
+        candidate.summary,
+        candidate.url ? `公开来源：${candidate.url}` : null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
+    })
+    await this.workflowService.attachMaterials(project.id, [
+      imported.material.id,
+    ])
+    const selected = await this.repository.markCandidateSelected(id, {
+      materialId: imported.material.id,
+      projectId: project.id,
+    })
+    return {
+      candidate: selected,
+      material: analysis?.material ?? imported.material,
+      project,
+      replayed: false,
+    }
   }
 }
