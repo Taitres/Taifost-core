@@ -43,6 +43,7 @@ import { HelperModule as BizHelperModule } from './modules/helper/helper.module'
 import { InitModule } from './modules/init/init.module'
 import { LinkModule } from './modules/link/link.module'
 import { MarkdownModule } from './modules/markdown/markdown.module'
+import { MarlinModule } from './modules/marlin/marlin.module'
 import { MembershipModule } from './modules/membership/membership.module'
 import { MetaPresetModule } from './modules/meta-preset/meta-preset.module'
 import { NoteModule } from './modules/note/note.module'
@@ -107,6 +108,7 @@ import { SampleResponseInterceptor } from './shared/sample/sample-response.inter
     HealthModule,
     LinkModule,
     MarkdownModule,
+    MarlinModule,
     MembershipModule,
     MetaPresetModule,
     NoteModule,
