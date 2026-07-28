@@ -1,9 +1,12 @@
-FROM node:24 AS builder
+FROM node:24-bookworm-slim AS builder
 ENV MONGOMS_DISABLE_POSTINSTALL=1
 ENV REDISMS_DISABLE_POSTINSTALL=1
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git g++ make python3 \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 RUN corepack prepare pnpm@11.13.0 --activate
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
