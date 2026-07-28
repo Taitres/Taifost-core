@@ -11,8 +11,15 @@ export default defineConfig({
   dts: { eager: true },
   format: ['esm'],
   platform: 'node',
-  // Inline every dependency so the produced CLI is a single, runnable file.
-  noExternal: () => true,
+  // Inline every runtime dependency so the produced CLI is a single runnable
+  // file. Keep third-party declaration files external: bundling Drizzle's
+  // conditional .d.ts graph makes rolldown treat type-only exports as values.
+  deps: {
+    alwaysBundle: () => true,
+    dts: {
+      neverBundle: [/.*/],
+    },
+  },
   sourcemap: true,
   shims: true,
 })
