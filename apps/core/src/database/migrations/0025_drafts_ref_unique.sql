@@ -1,3 +1,4 @@
+-- migration-lint:allow=no-bare-create-index reason=Drizzle executes migrations transactionally, so PostgreSQL forbids CONCURRENTLY here
 DO $$
 BEGIN
 	IF EXISTS (
@@ -13,4 +14,4 @@ BEGIN
 END
 $$;
 --> statement-breakpoint
-CREATE UNIQUE INDEX CONCURRENTLY "drafts_ref_uniq" ON "drafts" USING btree ("ref_type","ref_id") WHERE "drafts"."ref_id" is not null;
+CREATE UNIQUE INDEX "drafts_ref_uniq" ON "drafts" USING btree ("ref_type","ref_id") WHERE "drafts"."ref_id" is not null;
