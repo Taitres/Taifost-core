@@ -136,4 +136,18 @@ export class MarlinMaterialRepository extends BaseRepository {
       .returning()
     return row ?? null
   }
+
+  async updateAnalysis(id: string, analysis: Record<string, unknown>) {
+    const [row] = await this.db
+      .update(marlinMaterials)
+      .set({
+        analysis,
+        analyzedAt: new Date(),
+        status: 'analyzed',
+        updatedAt: new Date(),
+      })
+      .where(eq(marlinMaterials.id, this.toDbId(id)))
+      .returning()
+    return row ?? null
+  }
 }

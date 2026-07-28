@@ -30,9 +30,26 @@ export const MarlinMaterialListSchema = BasicPagerSchema.extend({
   search: z.string().trim().max(200).optional(),
 })
 
+export const MarlinMaterialUrlImportSchema = z.object({
+  url: z.url().max(2048),
+  title: z.string().trim().min(1).max(300).optional(),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+})
+
+export const MarlinMaterialAnalyzeSchema = z.object({
+  force: z.boolean().default(false),
+  archiveImages: z.boolean().default(true),
+})
+
 export class MarlinMaterialImportDto extends createZodDto(
   MarlinMaterialImportSchema,
 ) {}
 export class MarlinMaterialListDto extends createZodDto(
   MarlinMaterialListSchema,
+) {}
+export class MarlinMaterialUrlImportDto extends createZodDto(
+  MarlinMaterialUrlImportSchema,
+) {}
+export class MarlinMaterialAnalyzeDto extends createZodDto(
+  MarlinMaterialAnalyzeSchema,
 ) {}

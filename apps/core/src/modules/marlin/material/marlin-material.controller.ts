@@ -16,8 +16,10 @@ import { EntityIdDto } from '~/shared/dto/id.dto'
 
 import { MarlinMaterialRepository } from './marlin-material.repository'
 import {
+  MarlinMaterialAnalyzeDto,
   MarlinMaterialImportDto,
   MarlinMaterialListDto,
+  MarlinMaterialUrlImportDto,
 } from './marlin-material.schema'
 import { MarlinMaterialService } from './marlin-material.service'
 
@@ -34,6 +36,11 @@ export class MarlinMaterialController {
     return this.service.import(body)
   }
 
+  @Post('/from-url')
+  importUrl(@Body() body: MarlinMaterialUrlImportDto) {
+    return this.service.importUrl(body)
+  }
+
   @Get('/')
   async list(@Query() query: MarlinMaterialListDto) {
     const result = await this.repository.list(query)
@@ -48,6 +55,16 @@ export class MarlinMaterialController {
     const material = await this.repository.findById(id)
     if (!material) throw new NotFoundException('Material not found')
     return material
+  }
+
+  @Post('/:id/analyze')
+  async analyze(
+    @Param() { id }: EntityIdDto,
+    @Body() body: MarlinMaterialAnalyzeDto,
+  ) {
+    const result = await this.service.analyze(id, body)
+    if (!result) throw new NotFoundException('Material not found')
+    return result
   }
 
   @Post('/:id/archive')

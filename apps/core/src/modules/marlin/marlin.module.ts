@@ -10,6 +10,7 @@ import { MarlinHotspotService } from './hotspot/marlin-hotspot.service'
 import { MarlinMaterialController } from './material/marlin-material.controller'
 import { MarlinMaterialRepository } from './material/marlin-material.repository'
 import { MarlinMaterialService } from './material/marlin-material.service'
+import { MarlinOpenListService } from './material/marlin-openlist.service'
 import {
   MarlinPublicReviewController,
   MarlinWorkflowController,
@@ -29,6 +30,7 @@ import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
   providers: [
     MarlinMaterialRepository,
     MarlinMaterialService,
+    MarlinOpenListService,
     MarlinWorkflowRepository,
     MarlinWorkflowService,
     MarlinWorkflowScheduler,
