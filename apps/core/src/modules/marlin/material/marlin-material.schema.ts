@@ -11,7 +11,13 @@ const sourceTypes = [
   'upload',
   'manual',
 ] as const
-const materialStatuses = ['ready', 'analyzed', 'archived', 'purged'] as const
+const materialStatuses = [
+  'ready',
+  'pending',
+  'analyzed',
+  'archived',
+  'purged',
+] as const
 
 export const MarlinMaterialImportSchema = z.object({
   kind: z.enum(materialKinds),
@@ -39,6 +45,7 @@ export const MarlinMaterialUrlImportSchema = z.object({
 export const MarlinMaterialAnalyzeSchema = z.object({
   force: z.boolean().default(false),
   archiveImages: z.boolean().default(true),
+  ignoreFailedImages: z.boolean().default(false),
 })
 
 export class MarlinMaterialImportDto extends createZodDto(

@@ -278,40 +278,56 @@ export class MarlinMaterialService {
 
   async analyze(
     id: string,
-    options: { force: boolean; archiveImages: boolean },
+    options: {
+      force: boolean
+      archiveImages: boolean
+      ignoreFailedImages?: boolean
+    },
   ) {
     const material = await this.repository.findById(id)
     if (!material) return null
-    if (material.analysis && !options.force) {
+    if (material.analysis && material.status !== 'pending' && !options.force) {
       return { material, analysis: material.analysis, reused: true }
     }
 
     const derived = this.buildAnalysis(material.content)
-    const media = options.archiveImages
-      ? await Promise.all(
-          derived.imageUrls.map(async (sourceUrl) => {
-            try {
-              return await this.openList.archiveRemoteImage(sourceUrl)
-            } catch (error) {
-              return {
-                sourceUrl,
-                status: 'failed' as const,
-                error: error instanceof Error ? error.message : String(error),
-              }
-            }
-          }),
-        )
-      : derived.imageUrls.map((sourceUrl) => ({
+    const media = options.ignoreFailedImages
+      ? derived.imageUrls.map((sourceUrl) => ({
           sourceUrl,
-          status: 'pending' as const,
+          status: 'ignored' as const,
         }))
+      : options.archiveImages
+        ? await Promise.all(
+            derived.imageUrls.map(async (sourceUrl) => {
+              try {
+                return await this.openList.archiveRemoteImage(sourceUrl)
+              } catch (error) {
+                return {
+                  sourceUrl,
+                  status: 'failed' as const,
+                  error: error instanceof Error ? error.message : String(error),
+                }
+              }
+            }),
+          )
+        : derived.imageUrls.map((sourceUrl) => ({
+            sourceUrl,
+            status: 'pending' as const,
+          }))
     const analysis = {
       version: 1,
       generatedAt: new Date().toISOString(),
       ...derived,
       media,
     }
-    const updated = await this.repository.updateAnalysis(id, analysis)
+    const hasUnresolvedMedia = media.some(({ status }) =>
+      ['failed', 'pending'].includes(status),
+    )
+    const updated = await this.repository.updateAnalysis(
+      id,
+      analysis,
+      hasUnresolvedMedia ? 'pending' : 'analyzed',
+    )
     return { material: updated, analysis, reused: false }
   }
 }

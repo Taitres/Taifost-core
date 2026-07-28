@@ -138,11 +138,24 @@ export class MarlinWorkflowRepository extends BaseRepository {
       if (!project) return null
 
       const existingMaterials = await tx
-        .select({ id: marlinMaterials.id })
+        .select({ id: marlinMaterials.id, status: marlinMaterials.status })
         .from(marlinMaterials)
         .where(inArray(marlinMaterials.id, materialIds))
       if (existingMaterials.length !== new Set(materialIds).size) {
-        return { project, missingMaterial: true, attached: [] }
+        return {
+          project,
+          missingMaterial: true,
+          pendingMaterial: false,
+          attached: [],
+        }
+      }
+      if (existingMaterials.some(({ status }) => status === 'pending')) {
+        return {
+          project,
+          missingMaterial: false,
+          pendingMaterial: true,
+          attached: [],
+        }
       }
 
       const attached = await tx
@@ -159,7 +172,12 @@ export class MarlinWorkflowRepository extends BaseRepository {
         .update(marlinProjects)
         .set({ updatedAt: new Date() })
         .where(eq(marlinProjects.id, projectId))
-      return { project, missingMaterial: false, attached }
+      return {
+        project,
+        missingMaterial: false,
+        pendingMaterial: false,
+        attached,
+      }
     })
   }
 

@@ -85,13 +85,18 @@ describe('MarlinMaterialService', () => {
     const repository = {
       findById: vi.fn().mockResolvedValue({
         id: '1',
+        status: 'ready',
         content:
           '# Core v3\n\n一段足够长的素材内容，用于生成可引用片段与关键词分析结果。\n\n![远程图](https://example.com/a.png)',
         analysis: null,
       }),
       updateAnalysis: vi
         .fn()
-        .mockImplementation(async (_id, analysis) => ({ id: '1', analysis })),
+        .mockImplementation(async (_id, analysis, status) => ({
+          id: '1',
+          analysis,
+          status,
+        })),
     }
     const openList = {
       archiveRemoteImage: vi
@@ -120,6 +125,53 @@ describe('MarlinMaterialService', () => {
         },
       ],
     })
-    expect(repository.updateAnalysis).toHaveBeenCalledOnce()
+    expect(repository.updateAnalysis).toHaveBeenCalledWith(
+      '1',
+      expect.anything(),
+      'pending',
+    )
+    expect(result?.material).toMatchObject({ status: 'pending' })
+  })
+
+  it('retries unresolved image archival instead of reusing pending analysis', async () => {
+    const repository = {
+      findById: vi.fn().mockResolvedValue({
+        id: '1',
+        status: 'pending',
+        content: '![远程图](https://example.com/a.png)',
+        analysis: { version: 1, media: [{ status: 'failed' }] },
+      }),
+      updateAnalysis: vi
+        .fn()
+        .mockImplementation(async (_id, analysis, status) => ({
+          id: '1',
+          analysis,
+          status,
+        })),
+    }
+    const openList = {
+      archiveRemoteImage: vi.fn().mockResolvedValue({
+        sourceUrl: 'https://example.com/a.png',
+        archivedUrl: 'https://media.example.com/d/marlin/a.png',
+        status: 'archived',
+      }),
+    }
+    const service = new MarlinMaterialService(
+      repository as unknown as MarlinMaterialRepository,
+      openList as unknown as MarlinOpenListService,
+    )
+
+    const result = await service.analyze('1', {
+      force: false,
+      archiveImages: true,
+    })
+
+    expect(openList.archiveRemoteImage).toHaveBeenCalledOnce()
+    expect(repository.updateAnalysis).toHaveBeenCalledWith(
+      '1',
+      expect.anything(),
+      'analyzed',
+    )
+    expect(result?.reused).toBe(false)
   })
 })

@@ -9,6 +9,7 @@ import type { EmailService } from '~/processors/helper/helper.email.service'
 
 const createService = () => {
   const repository = {
+    attachMaterials: vi.fn(),
     createReviewRequest: vi.fn(),
     createPublication: vi.fn(),
     decideReview: vi.fn(),
@@ -39,6 +40,20 @@ const createService = () => {
 }
 
 describe('MarlinWorkflowService', () => {
+  it('blocks pending materials from entering a creation project', async () => {
+    const { repository, service } = createService()
+    repository.attachMaterials.mockResolvedValue({
+      project: { id: 'project-1' },
+      missingMaterial: false,
+      pendingMaterial: true,
+      attached: [],
+    })
+
+    await expect(
+      service.attachMaterials('project-1', ['material-1']),
+    ).rejects.toThrow('Pending materials')
+  })
+
   it('returns a one-time review passcode while persisting only a salted hash', async () => {
     const { repository, service } = createService()
     repository.findProject.mockResolvedValue({

@@ -137,13 +137,17 @@ export class MarlinMaterialRepository extends BaseRepository {
     return row ?? null
   }
 
-  async updateAnalysis(id: string, analysis: Record<string, unknown>) {
+  async updateAnalysis(
+    id: string,
+    analysis: Record<string, unknown>,
+    status: 'pending' | 'analyzed',
+  ) {
     const [row] = await this.db
       .update(marlinMaterials)
       .set({
         analysis,
         analyzedAt: new Date(),
-        status: 'analyzed',
+        status,
         updatedAt: new Date(),
       })
       .where(eq(marlinMaterials.id, this.toDbId(id)))

@@ -53,6 +53,11 @@ export class MarlinWorkflowService {
     if (result.missingMaterial) {
       throw new BadRequestException('One or more materials do not exist')
     }
+    if (result.pendingMaterial) {
+      throw new ConflictException(
+        'Pending materials must resolve or explicitly ignore every remote image before entering a project',
+      )
+    }
     return result
   }
 
