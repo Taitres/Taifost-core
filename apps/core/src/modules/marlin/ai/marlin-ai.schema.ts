@@ -5,6 +5,7 @@ export const marlinAiSlots = [
   'material-analyst',
   'topic-planner',
   'writer',
+  'quick-rewriter',
   'reviewer',
   'fact-checker',
   'seo-editor',
@@ -37,6 +38,4 @@ export class MarlinAiRoleDto extends createZodDto(MarlinAiRoleSchema) {}
 export class MarlinAiAdviceDto extends createZodDto(MarlinAiAdviceSchema) {}
 
 export type MarlinAiRoleInput = z.infer<typeof MarlinAiRoleSchema>
-export type MarlinAiAdviceOutput = z.infer<
-  typeof MarlinAiAdviceOutputSchema
->
+export type MarlinAiAdviceOutput = z.infer<typeof MarlinAiAdviceOutputSchema>
