@@ -15,10 +15,19 @@ x-marlin-env: &marlin-env
   ENCRYPT_KEY: ${ENCRYPT_KEY:-}
   JWT_SECRET: ${JWT_SECRET:-marlin-local-change-before-production}
   DISABLE_CACHE: ${DISABLE_CACHE:-false}
+  MX_DISABLE_TELEMETRY: ${MX_DISABLE_TELEMETRY:-true}
+  MARLIN_REVIEW_PASSCODE: ${MARLIN_REVIEW_PASSCODE:-}
+  MARLIN_OPENLIST_URL: ${MARLIN_OPENLIST_URL:-}
+  MARLIN_OPENLIST_TOKEN: ${MARLIN_OPENLIST_TOKEN:-}
+  MARLIN_OPENLIST_DIRECTORY: ${MARLIN_OPENLIST_DIRECTORY:-marlin/assets}
+  MARLIN_OPENLIST_PUBLIC_URL: ${MARLIN_OPENLIST_PUBLIC_URL:-}
 
 services:
   marlin-core:
-    image: ${MX_CORE_IMAGE:-innei/mx-server:latest}
+    image: ${MX_CORE_IMAGE:-marlin-core:13.18.0}
+    build:
+      context: .
+      dockerfile: dockerfile
     container_name: marlin-core-v3
     restart: unless-stopped
     ports:
@@ -39,7 +48,10 @@ services:
       start_period: 30s
 
   marlin-migrate:
-    image: ${MX_CORE_IMAGE:-innei/mx-server:latest}
+    image: ${MX_CORE_IMAGE:-marlin-core:13.18.0}
+    build:
+      context: .
+      dockerfile: dockerfile
     container_name: marlin-core-migrate
     command: ["node", "migrate.mjs"]
     restart: "no"
