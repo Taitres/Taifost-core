@@ -1,12 +1,18 @@
 FROM node:24-alpine AS builder
 ENV MONGOMS_DISABLE_POSTINSTALL=1
 ENV REDISMS_DISABLE_POSTINSTALL=1
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
-COPY . .
 RUN apk add --no-cache git make g++ python3
 RUN corepack enable
 RUN corepack prepare --activate
-RUN pnpm install --frozen-lockfile
+COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,id=marlin-core-pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store && pnpm fetch --frozen-lockfile
+COPY . .
+RUN --mount=type=cache,id=marlin-core-pnpm,target=/pnpm/store \
+    pnpm install --offline --frozen-lockfile
 RUN pnpm bundle
 RUN mv apps/core/out ./out
 RUN cp -R apps/core/src/database/migrations ./out/migrations
