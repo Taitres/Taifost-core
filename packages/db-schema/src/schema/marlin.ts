@@ -5,6 +5,7 @@ import {
   integer,
   jsonb,
   pgTable,
+  real,
   text,
   uniqueIndex,
 } from 'drizzle-orm/pg-core'
@@ -229,6 +230,134 @@ export const marlinPublications = pgTable(
     index('marlin_publications_status_scheduled_idx').on(
       table.status,
       table.scheduledAt,
+    ),
+  ],
+)
+
+export const marlinHotspotThemes = pgTable(
+  'marlin_hotspot_themes',
+  {
+    id: pkText(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    name: text('name').notNull(),
+    keywords: text('keywords')
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    dailyQuota: integer('daily_quota').notNull().default(20),
+    enabled: boolean('enabled').notNull().default(true),
+  },
+  (table) => [uniqueIndex('marlin_hotspot_themes_name_uniq').on(table.name)],
+)
+
+export const marlinHotspotSources = pgTable(
+  'marlin_hotspot_sources',
+  {
+    id: pkText(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    themeId: refText('theme_id').references(() => marlinHotspotThemes.id, {
+      onDelete: 'set null',
+    }),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    format: text('format').notNull(),
+    config: jsonb('config')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+    dailyQuota: integer('daily_quota').notNull().default(20),
+    enabled: boolean('enabled').notNull().default(true),
+    lastFetchedAt: tsCol('last_fetched_at'),
+    lastError: text('last_error'),
+  },
+  (table) => [
+    uniqueIndex('marlin_hotspot_sources_url_uniq').on(table.url),
+    index('marlin_hotspot_sources_enabled_idx').on(table.enabled),
+  ],
+)
+
+export const marlinHotspotCandidates = pgTable(
+  'marlin_hotspot_candidates',
+  {
+    id: pkText(),
+    createdAt: createdAt(),
+    sourceId: refText('source_id')
+      .notNull()
+      .references(() => marlinHotspotSources.id, { onDelete: 'cascade' }),
+    themeId: refText('theme_id').references(() => marlinHotspotThemes.id, {
+      onDelete: 'set null',
+    }),
+    eventHash: text('event_hash').notNull(),
+    title: text('title').notNull(),
+    url: text('url'),
+    summary: text('summary'),
+    publishedAt: tsCol('published_at'),
+    score: integer('score').notNull().default(0),
+    status: text('status').notNull().default('inbox'),
+    raw: jsonb('raw')
+      .$type<Record<string, unknown>>()
+      .notNull()
+      .default(sql`'{}'::jsonb`),
+  },
+  (table) => [
+    uniqueIndex('marlin_hotspot_candidates_event_hash_uniq').on(
+      table.eventHash,
+    ),
+    index('marlin_hotspot_candidates_status_created_idx').on(
+      table.status,
+      table.createdAt,
+    ),
+    index('marlin_hotspot_candidates_theme_created_idx').on(
+      table.themeId,
+      table.createdAt,
+    ),
+  ],
+)
+
+export const marlinAiRoles = pgTable(
+  'marlin_ai_roles',
+  {
+    id: pkText(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+    slot: text('slot').notNull(),
+    providerId: text('provider_id').notNull(),
+    model: text('model').notNull(),
+    systemPrompt: text('system_prompt').notNull().default(''),
+    temperature: real('temperature').notNull().default(0.4),
+    maxTokens: integer('max_tokens').notNull().default(4096),
+    dailyBudgetCents: integer('daily_budget_cents').notNull().default(0),
+    enabled: boolean('enabled').notNull().default(true),
+  },
+  (table) => [uniqueIndex('marlin_ai_roles_slot_uniq').on(table.slot)],
+)
+
+export const marlinAiUsage = pgTable(
+  'marlin_ai_usage',
+  {
+    id: pkText(),
+    createdAt: createdAt(),
+    roleId: refText('role_id')
+      .notNull()
+      .references(() => marlinAiRoles.id, { onDelete: 'restrict' }),
+    projectId: refText('project_id').references(() => marlinProjects.id, {
+      onDelete: 'set null',
+    }),
+    operation: text('operation').notNull(),
+    providerId: text('provider_id').notNull(),
+    model: text('model').notNull(),
+    promptTokens: integer('prompt_tokens').notNull().default(0),
+    completionTokens: integer('completion_tokens').notNull().default(0),
+    totalTokens: integer('total_tokens').notNull().default(0),
+    costCents: integer('cost_cents').notNull().default(0),
+  },
+  (table) => [
+    index('marlin_ai_usage_role_created_idx').on(table.roleId, table.createdAt),
+    index('marlin_ai_usage_project_created_idx').on(
+      table.projectId,
+      table.createdAt,
     ),
   ],
 )

@@ -664,6 +664,9 @@ importers:
       es-toolkit:
         specifier: ^1.49.0
         version: 1.49.0
+      fast-xml-parser:
+        specifier: 5.10.0
+        version: 5.10.0
       file-type:
         specifier: ^22.0.1
         version: 22.0.1
@@ -10484,10 +10487,6 @@ packages:
     resolution: {integrity: sha512-ak9Qy5Q7jYb2Wwcey5Fpvg2KoAc/ZIhLSLOSBmRmygPsGwkVVt0fZa0qrtMz+m6tJTAHfZQ8FnmB4MG4LWy7/w==}
     engines: {node: '>=8'}
 
-  path-expression-matcher@1.6.0:
-    resolution: {integrity: sha512-e5y7RCLHKjemsgQ4eqGJtPyr10ILz25HO7flzxhTV8bgvd5yHx98DGtCAtbVW9f2TqnYI/gEVZd+vz7snrdPTw==}
-    engines: {node: '>=14.0.0'}
-
   path-expression-matcher@1.6.2:
     resolution: {integrity: sha512-enSlaiat05iasnzmgNxRj8reFdj3puY2QpNgP1aPIaVfT6nn9ICuPoFlKHk8EN22HcwewshO+mN2DGbkCEOtqQ==}
     engines: {node: '>=14.0.0'}
@@ -13845,7 +13844,7 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@smithy/node-http-handler': 4.7.3
       http-proxy-agent: 7.0.2(supports-color@5.5.0)
-      https-proxy-agent: 7.0.6(supports-color@5.5.0)
+      https-proxy-agent: 7.0.6
       openai: 6.26.0(ws@8.21.1)(zod@4.4.3)
       partial-json: 0.1.7
       typebox: 1.1.38
@@ -17394,7 +17393,7 @@ snapshots:
     dependencies:
       debug: 4.3.7
       notepack.io: 3.0.1
-      socket.io-parser: 4.2.6(supports-color@5.5.0)
+      socket.io-parser: 4.2.6
     transitivePeerDependencies:
       - supports-color
 
@@ -20555,7 +20554,7 @@ snapshots:
 
   fast-xml-builder@1.2.0:
     dependencies:
-      path-expression-matcher: 1.6.0
+      path-expression-matcher: 1.6.2
       xml-naming: 0.1.0
 
   fast-xml-parser@5.10.0:
@@ -20790,7 +20789,7 @@ snapshots:
   gaxios@7.2.0:
     dependencies:
       extend: 3.0.2
-      https-proxy-agent: 7.0.6(supports-color@5.5.0)
+      https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
     transitivePeerDependencies:
       - supports-color
@@ -20947,7 +20946,7 @@ snapshots:
       buffer-image-size: 0.6.4
       entities: 7.0.1
       whatwg-mimetype: 3.0.0
-      ws: 8.21.0
+      ws: 8.21.1
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -21132,7 +21131,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  https-proxy-agent@7.0.6(supports-color@5.5.0):
+  https-proxy-agent@7.0.6:
     dependencies:
       agent-base: 7.1.4
       debug: 4.4.3(supports-color@5.5.0)
@@ -22772,8 +22771,6 @@ snapshots:
 
   path-exists@4.0.0: {}
 
-  path-expression-matcher@1.6.0: {}
-
   path-expression-matcher@1.6.2: {}
 
   path-is-absolute@1.0.1: {}
@@ -23205,7 +23202,7 @@ snapshots:
       find-cache-dir: 3.3.2
       find-package-json: 1.2.0
       get-port: 5.1.1
-      https-proxy-agent: 7.0.6(supports-color@5.5.0)
+      https-proxy-agent: 7.0.6
       lockfile: 1.0.4
       rimraf: 5.0.10
       semver: 7.8.5
@@ -23783,13 +23780,13 @@ snapshots:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3(supports-color@5.5.0)
       engine.io-client: 6.6.6(supports-color@5.5.0)
-      socket.io-parser: 4.2.6(supports-color@5.5.0)
+      socket.io-parser: 4.2.6
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
 
-  socket.io-parser@4.2.6(supports-color@5.5.0):
+  socket.io-parser@4.2.6:
     dependencies:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3(supports-color@5.5.0)
@@ -23804,7 +23801,7 @@ snapshots:
       debug: 4.4.3(supports-color@5.5.0)
       engine.io: 6.6.9
       socket.io-adapter: 2.5.8
-      socket.io-parser: 4.2.6(supports-color@5.5.0)
+      socket.io-parser: 4.2.6
     transitivePeerDependencies:
       - bufferutil
       - supports-color
