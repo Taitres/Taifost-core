@@ -323,10 +323,20 @@ export class MarlinMaterialService {
     const hasUnresolvedMedia = media.some(({ status }) =>
       ['failed', 'pending'].includes(status),
     )
+    const localizedContent = media.reduce(
+      (content, item) =>
+        item.status === 'archived'
+          ? content.replaceAll(item.sourceUrl, item.archivedUrl)
+          : content,
+      material.content,
+    )
+    const fullyLocalized =
+      media.length > 0 && media.every(({ status }) => status === 'archived')
     const updated = await this.repository.updateAnalysis(
       id,
       analysis,
       hasUnresolvedMedia ? 'pending' : 'analyzed',
+      fullyLocalized ? localizedContent : undefined,
     )
     return { material: updated, analysis, reused: false }
   }

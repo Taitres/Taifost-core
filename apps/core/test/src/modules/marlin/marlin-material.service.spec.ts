@@ -129,6 +129,7 @@ describe('MarlinMaterialService', () => {
       '1',
       expect.anything(),
       'pending',
+      undefined,
     )
     expect(result?.material).toMatchObject({ status: 'pending' })
   })
@@ -171,6 +172,7 @@ describe('MarlinMaterialService', () => {
       '1',
       expect.anything(),
       'analyzed',
+      '![远程图](https://media.example.com/d/marlin/a.png)',
     )
     expect(result?.reused).toBe(false)
   })

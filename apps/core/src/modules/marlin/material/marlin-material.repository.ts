@@ -242,6 +242,7 @@ export class MarlinMaterialRepository extends BaseRepository {
     id: string,
     analysis: Record<string, unknown>,
     status: 'pending' | 'analyzed',
+    localizedContent?: string,
   ) {
     const [row] = await this.db
       .update(marlinMaterials)
@@ -249,6 +250,7 @@ export class MarlinMaterialRepository extends BaseRepository {
         analysis,
         analyzedAt: new Date(),
         status,
+        ...(localizedContent == null ? {} : { content: localizedContent }),
         updatedAt: new Date(),
       })
       .where(eq(marlinMaterials.id, this.toDbId(id)))
