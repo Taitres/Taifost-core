@@ -5,7 +5,7 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /app
 RUN corepack enable
-RUN corepack prepare --activate
+RUN corepack prepare pnpm@11.13.0 --activate
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=marlin-core-pnpm,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store && pnpm fetch --frozen-lockfile
