@@ -12,9 +12,7 @@ RUN corepack prepare pnpm@11.13.0 --activate
 COPY .npmrc package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,id=marlin-core-pnpm,target=/pnpm/store \
     pnpm config set store-dir /pnpm/store \
-    && pnpm fetch --frozen-lockfile \
-      --filter @mx-space/core... \
-      --filter @mx-admin/admin...
+    && pnpm fetch --frozen-lockfile
 COPY . .
 RUN --mount=type=cache,id=marlin-core-pnpm,target=/pnpm/store \
     pnpm install --offline --frozen-lockfile \
