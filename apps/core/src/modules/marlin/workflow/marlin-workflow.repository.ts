@@ -1,14 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import {
-  and,
-  desc,
-  eq,
-  ilike,
-  inArray,
-  max,
-  type SQL,
-  sql,
-} from 'drizzle-orm'
+import { and, desc, eq, ilike, inArray, max, type SQL, sql } from 'drizzle-orm'
 
 import { PG_DB_TOKEN } from '~/constants/system.constant'
 import {
@@ -172,7 +163,10 @@ export class MarlinWorkflowRepository extends BaseRepository {
     })
   }
 
-  async createRevision(projectIdInput: string, input: MarlinRevisionCreateInput) {
+  async createRevision(
+    projectIdInput: string,
+    input: MarlinRevisionCreateInput,
+  ) {
     const projectId = this.toDbId(projectIdInput)
     return this.db.transaction(async (tx) => {
       const [project] = await tx
@@ -223,6 +217,7 @@ export class MarlinWorkflowRepository extends BaseRepository {
     revisionId: string
     passcodeHash: string
     expiresAt: Date
+    reviewerEmail?: string
   }) {
     const projectId = this.toDbId(input.projectId)
     const revisionId = this.toDbId(input.revisionId)
@@ -256,6 +251,8 @@ export class MarlinWorkflowRepository extends BaseRepository {
           revisionId,
           passcodeHash: input.passcodeHash,
           expiresAt: input.expiresAt,
+          reviewerEmail: input.reviewerEmail,
+          emailStatus: input.reviewerEmail ? 'pending' : 'not_requested',
         })
         .returning()
       await tx
@@ -264,6 +261,22 @@ export class MarlinWorkflowRepository extends BaseRepository {
         .where(eq(marlinProjects.id, projectId))
       return { request, revision }
     })
+  }
+
+  async updateReviewEmailDelivery(
+    id: string,
+    delivery: { status: 'sent' | 'failed'; error?: string },
+  ) {
+    const [row] = await this.db
+      .update(marlinReviewRequests)
+      .set({
+        emailStatus: delivery.status,
+        emailError: delivery.error ?? null,
+        emailedAt: delivery.status === 'sent' ? new Date() : null,
+      })
+      .where(eq(marlinReviewRequests.id, this.toDbId(id)))
+      .returning()
+    return row ?? null
   }
 
   async findReview(id: string) {
@@ -366,10 +379,7 @@ export class MarlinWorkflowRepository extends BaseRepository {
       .from(marlinReviewRequests)
       .where(
         and(
-          eq(
-            marlinReviewRequests.revisionId,
-            this.toDbId(revisionIdInput),
-          ),
+          eq(marlinReviewRequests.revisionId, this.toDbId(revisionIdInput)),
           eq(marlinReviewRequests.status, 'approved'),
         ),
       )

@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import type { CategoryService } from '~/modules/category/category.service'
+import type { ConfigsService } from '~/modules/configs/configs.service'
 import type { MarlinWorkflowRepository } from '~/modules/marlin/workflow/marlin-workflow.repository'
 import { MarlinWorkflowService } from '~/modules/marlin/workflow/marlin-workflow.service'
 import type { PostService } from '~/modules/post/post.service'
+import type { EmailService } from '~/processors/helper/helper.email.service'
 
 const createService = () => {
   const repository = {
@@ -13,15 +15,27 @@ const createService = () => {
     findProject: vi.fn(),
     findPublishedRevision: vi.fn(),
     findReview: vi.fn(),
+    updateReviewEmailDelivery: vi.fn(),
   }
   const categoryService = { findCategoryById: vi.fn() }
   const postService = { create: vi.fn(), updateById: vi.fn() }
+  const configsService = { waitForConfigReady: vi.fn() }
+  const emailService = { checkIsReady: vi.fn(), send: vi.fn() }
   const service = new MarlinWorkflowService(
     repository as unknown as MarlinWorkflowRepository,
     categoryService as unknown as CategoryService,
     postService as unknown as PostService,
+    configsService as unknown as ConfigsService,
+    emailService as unknown as EmailService,
   )
-  return { categoryService, postService, repository, service }
+  return {
+    categoryService,
+    configsService,
+    emailService,
+    postService,
+    repository,
+    service,
+  }
 }
 
 describe('MarlinWorkflowService', () => {
@@ -51,6 +65,61 @@ describe('MarlinWorkflowService', () => {
     expect(result.passcode).toMatch(/^\d{6}$/)
     expect(persisted.passcodeHash).not.toContain(result.passcode)
     expect(result.request).not.toHaveProperty('passcodeHash')
+  })
+
+  it('emails the external reviewer and records delivery status', async () => {
+    const { configsService, emailService, repository, service } =
+      createService()
+    repository.findProject.mockResolvedValue({
+      id: 'project-1',
+      title: '待审文章',
+      currentRevisionId: 'revision-1',
+    })
+    repository.createReviewRequest.mockImplementation(async (input) => ({
+      request: {
+        id: 'review-1',
+        projectId: input.projectId,
+        revisionId: input.revisionId,
+        passcodeHash: input.passcodeHash,
+        expiresAt: input.expiresAt,
+        status: 'pending',
+      },
+      revision: { id: input.revisionId, version: 3 },
+    }))
+    configsService.waitForConfigReady.mockResolvedValue({
+      url: { webUrl: 'https://example.com' },
+      seo: { title: 'MARLIN.LOG' },
+      mailOptions: {
+        enable: true,
+        from: 'owner@example.com',
+        smtp: {},
+      },
+    })
+    emailService.checkIsReady.mockResolvedValue(true)
+    emailService.send.mockResolvedValue({ accepted: ['reviewer@example.com'] })
+
+    const result = await service.requestReview('project-1', {
+      expiresInHours: 24,
+      reviewerEmail: 'reviewer@example.com',
+    })
+
+    expect(emailService.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'reviewer@example.com',
+        subject: expect.stringContaining('待审文章'),
+        text: expect.stringContaining(
+          'https://example.com/studio/review/review-1',
+        ),
+      }),
+    )
+    expect(repository.updateReviewEmailDelivery).toHaveBeenCalledWith(
+      'review-1',
+      { status: 'sent' },
+    )
+    expect(result.emailDelivery).toEqual({
+      status: 'sent',
+      to: 'reviewer@example.com',
+    })
   })
 
   it('refuses to publish a revision different from the approved snapshot', async () => {

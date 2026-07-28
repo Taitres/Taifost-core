@@ -1,4 +1,9 @@
-import { randomBytes, randomInt, scryptSync, timingSafeEqual } from 'node:crypto'
+import {
+  randomBytes,
+  randomInt,
+  scryptSync,
+  timingSafeEqual,
+} from 'node:crypto'
 
 import {
   BadRequestException,
@@ -9,7 +14,9 @@ import {
 } from '@nestjs/common'
 
 import { CategoryService } from '~/modules/category/category.service'
+import { ConfigsService } from '~/modules/configs/configs.service'
 import { PostService } from '~/modules/post/post.service'
+import { EmailService } from '~/processors/helper/helper.email.service'
 import { ContentFormat } from '~/shared/types/content-format.type'
 
 import { MarlinWorkflowRepository } from './marlin-workflow.repository'
@@ -26,6 +33,8 @@ export class MarlinWorkflowService {
     private readonly repository: MarlinWorkflowRepository,
     private readonly categoryService: CategoryService,
     private readonly postService: PostService,
+    private readonly configsService: ConfigsService,
+    private readonly emailService: EmailService,
   ) {}
 
   createProject(input: MarlinProjectCreateInput) {
@@ -75,13 +84,19 @@ export class MarlinWorkflowService {
 
   async requestReview(
     projectId: string,
-    input: { revisionId?: string; expiresInHours: number },
+    input: {
+      revisionId?: string
+      expiresInHours: number
+      reviewerEmail?: string
+    },
   ) {
     const project = await this.repository.findProject(projectId)
     if (!project) throw new NotFoundException('MARLIN project not found')
     const revisionId = input.revisionId ?? project.currentRevisionId
     if (!revisionId) {
-      throw new BadRequestException('Create a revision before requesting review')
+      throw new BadRequestException(
+        'Create a revision before requesting review',
+      )
     }
     const passcode = randomInt(0, 1_000_000).toString().padStart(6, '0')
     const result = await this.repository.createReviewRequest({
@@ -89,15 +104,70 @@ export class MarlinWorkflowService {
       revisionId,
       passcodeHash: this.hashPasscode(passcode),
       expiresAt: new Date(Date.now() + input.expiresInHours * 60 * 60 * 1000),
+      reviewerEmail: input.reviewerEmail,
     })
     if (!result) {
       throw new BadRequestException('Revision does not belong to this project')
     }
-    const { passcodeHash: _, ...request } = result.request
+    let emailDelivery:
+      | { status: 'not_requested' }
+      | { status: 'sent'; to: string }
+      | { status: 'failed'; to: string; error: string } = {
+      status: 'not_requested',
+    }
+    if (input.reviewerEmail) {
+      try {
+        const [{ url, seo, mailOptions }, ready] = await Promise.all([
+          this.configsService.waitForConfigReady(),
+          this.emailService.checkIsReady(),
+        ])
+        if (!ready || !mailOptions.enable) {
+          throw new Error('Core email delivery is not configured')
+        }
+        const senderEmail = mailOptions.from || mailOptions.smtp?.user
+        if (!senderEmail) throw new Error('Core email sender is not configured')
+        const reviewUrl = new URL(
+          `/studio/review/${result.request.id}`,
+          url.webUrl || 'http://localhost:2323',
+        ).href
+        await this.emailService.send({
+          from: `"${seo.title || 'MARLIN.LOG'}" <${senderEmail}>`,
+          to: input.reviewerEmail,
+          subject: `[MARLIN 审阅] ${project.title} · v${result.revision.version}`,
+          text: [
+            `请审阅：${project.title}`,
+            `修订版本：v${result.revision.version}`,
+            `审阅地址：${reviewUrl}`,
+            `六位口令：${passcode}`,
+            `有效期至：${result.request.expiresAt.toISOString()}`,
+            '审阅通过不会自动发布，最终发布仍由站点所有者确认。',
+          ].join('\n'),
+        })
+        await this.repository.updateReviewEmailDelivery(result.request.id, {
+          status: 'sent',
+        })
+        emailDelivery = { status: 'sent', to: input.reviewerEmail }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        await this.repository.updateReviewEmailDelivery(result.request.id, {
+          status: 'failed',
+          error: message,
+        })
+        emailDelivery = {
+          status: 'failed',
+          to: input.reviewerEmail,
+          error: message,
+        }
+      }
+    }
+    const { passcodeHash: _, ...request } =
+      (await this.repository.findReview(result.request.id))?.request ??
+      result.request
     return {
       request,
       passcode,
       reviewPath: `/studio/review/${request.id}`,
+      emailDelivery,
     }
   }
 
@@ -131,7 +201,8 @@ export class MarlinWorkflowService {
       comment: input.comment,
       idempotencyKey: input.idempotencyKey,
     })
-    if (!result) throw new ConflictException('Review request is no longer pending')
+    if (!result)
+      throw new ConflictException('Review request is no longer pending')
     return result
   }
 
@@ -210,8 +281,9 @@ export class MarlinWorkflowService {
   }
 
   async publishDue() {
-    const publications =
-      await this.repository.findScheduledPublications(new Date())
+    const publications = await this.repository.findScheduledPublications(
+      new Date(),
+    )
     const results: Array<{ id: string; status: string }> = []
     for (const publication of publications) {
       try {

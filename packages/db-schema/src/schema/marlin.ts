@@ -171,6 +171,10 @@ export const marlinReviewRequests = pgTable(
     passcodeHash: text('passcode_hash').notNull(),
     expiresAt: tsCol('expires_at').notNull(),
     decidedAt: tsCol('decided_at'),
+    reviewerEmail: text('reviewer_email'),
+    emailStatus: text('email_status').notNull().default('not_requested'),
+    emailError: text('email_error'),
+    emailedAt: tsCol('emailed_at'),
   },
   (table) => [
     index('marlin_review_requests_project_status_idx').on(

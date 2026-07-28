@@ -45,6 +45,7 @@ export const MarlinRevisionCreateSchema = z.object({
 export const MarlinReviewCreateSchema = z.object({
   revisionId: zEntityId.optional(),
   expiresInHours: z.coerce.number().int().min(1).max(720).default(72),
+  reviewerEmail: z.email().max(320).optional(),
 })
 
 export const MarlinReviewAccessSchema = z.object({
@@ -88,12 +89,8 @@ export class MarlinReviewDecisionDto extends createZodDto(
 ) {}
 export class MarlinPublishDto extends createZodDto(MarlinPublishSchema) {}
 
-export type MarlinProjectCreateInput = z.infer<
-  typeof MarlinProjectCreateSchema
->
-export type MarlinProjectPatchInput = z.infer<
-  typeof MarlinProjectPatchSchema
->
+export type MarlinProjectCreateInput = z.infer<typeof MarlinProjectCreateSchema>
+export type MarlinProjectPatchInput = z.infer<typeof MarlinProjectPatchSchema>
 export type MarlinProjectListInput = z.infer<typeof MarlinProjectListSchema>
 export type MarlinRevisionCreateInput = z.infer<
   typeof MarlinRevisionCreateSchema

@@ -58,10 +58,7 @@ export class MarlinWorkflowController {
   }
 
   @Patch('/:id')
-  patch(
-    @Param() { id }: EntityIdDto,
-    @Body() body: MarlinProjectPatchDto,
-  ) {
+  patch(@Param() { id }: EntityIdDto, @Body() body: MarlinProjectPatchDto) {
     return this.service.patchProject(id, body)
   }
 
@@ -90,10 +87,7 @@ export class MarlinWorkflowController {
   }
 
   @Post('/:id/publish')
-  publish(
-    @Param() { id }: EntityIdDto,
-    @Body() body: MarlinPublishDto,
-  ) {
+  publish(@Param() { id }: EntityIdDto, @Body() body: MarlinPublishDto) {
     return this.service.publish(id, body)
   }
 
@@ -108,18 +102,12 @@ export class MarlinPublicReviewController {
   constructor(private readonly service: MarlinWorkflowService) {}
 
   @Post('/:id/preview')
-  preview(
-    @Param() { id }: EntityIdDto,
-    @Body() body: MarlinReviewAccessDto,
-  ) {
+  preview(@Param() { id }: EntityIdDto, @Body() body: MarlinReviewAccessDto) {
     return this.service.previewReview(id, body.passcode)
   }
 
   @Post('/:id/decision')
-  decide(
-    @Param() { id }: EntityIdDto,
-    @Body() body: MarlinReviewDecisionDto,
-  ) {
+  decide(@Param() { id }: EntityIdDto, @Body() body: MarlinReviewDecisionDto) {
     return this.service.decideReview(id, body)
   }
 }
