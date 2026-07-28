@@ -27,8 +27,9 @@ MARLIN_OPENLIST_PUBLIC_URL=https://openlist.example.com
 ```
 
 `MARLIN_OPENLIST_TOKEN` must be able to upload to the configured directory.
-Image archive failures remain visible in each material's analysis and never
-silently replace the source URL.
+Image archive failures remain visible in the material and media library. They
+put the material into `pending`, which blocks creation until a retry succeeds
+or the owner explicitly selects **Ignore images and continue**.
 
 ## Parallel startup
 
@@ -63,7 +64,8 @@ For the final apply window:
 
 1. Export a final `mongodump`.
 2. Stop only the old Core writer; keep MongoDB running.
-3. Run the same command with `--mode apply`.
+3. Run the same command with `--mode apply`. It is idempotent and can safely be
+   rerun against the same PostgreSQL target after an interruption.
 4. Start Core v3, verify counts, owner login, public pages, RSS and sitemap.
 5. Point the reverse proxy to Core `2334` and Shiro `2324`.
 6. Keep the MongoDB snapshot and old containers stopped but recoverable.
@@ -87,3 +89,18 @@ archive under `data-marlin`, then start the exact recorded image/commit.
 
 OpenList media is external and must be backed up using the OpenList storage
 driver's own backup policy.
+
+## Acceptance checklist
+
+- Owner can sign in at `/studio`, import a URL/file, analyze it, and see each
+  OpenList result.
+- Pending media cannot be attached to a project; retry and explicit ignore
+  both unblock it.
+- Media library distinguishes used, unused, and unresolved objects.
+- Selected Markdown can be replaced by the `quick-rewriter` role and is only
+  persisted when a new immutable revision is created.
+- Review requests bind to one revision; mail delivery state is visible and the
+  configured six-digit passcode is never included in email.
+- Only the exact approved revision publishes; schedule and withdrawal work.
+- Home, post list/detail, notes, pages, projects, RSS and sitemap all return
+  successfully through Shiro.
