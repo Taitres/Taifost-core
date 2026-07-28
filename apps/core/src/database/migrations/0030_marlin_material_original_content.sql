@@ -1,0 +1,1 @@
+ALTER TABLE "marlin_materials" ADD COLUMN "original_content" text;

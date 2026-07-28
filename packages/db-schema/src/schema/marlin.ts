@@ -27,6 +27,7 @@ export const marlinMaterials = pgTable(
     kind: text('kind').notNull(),
     title: text('title').notNull(),
     content: text('content').notNull(),
+    originalContent: text('original_content'),
     contentHash: text('content_hash').notNull(),
     mimeType: text('mime_type').notNull().default('text/plain'),
     byteSize: integer('byte_size').notNull(),

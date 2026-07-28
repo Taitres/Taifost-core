@@ -112,6 +112,9 @@ describe('MarlinWorkflowService', () => {
         ),
       }),
     )
+    expect(emailService.send.mock.calls[0][0].text).not.toContain(
+      result.passcode,
+    )
     expect(repository.updateReviewEmailDelivery).toHaveBeenCalledWith(
       'review-1',
       { status: 'sent' },

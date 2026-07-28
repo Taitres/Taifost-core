@@ -33,6 +33,7 @@ describe('MarlinMaterialService', () => {
         kind: 'markdown',
         title: '示例素材',
         content,
+        originalContent: content,
         contentHash: createHash('sha256').update(content, 'utf8').digest('hex'),
         mimeType: 'text/markdown',
         byteSize: Buffer.byteLength(content, 'utf8'),
@@ -43,6 +44,40 @@ describe('MarlinMaterialService', () => {
         originalFilename: 'example.md',
         metadata: { importer: 'studio' },
       },
+    )
+  })
+
+  it('freezes original HTML while normalizing its useful body to Markdown', async () => {
+    const repository = {
+      importFrozen: vi.fn().mockResolvedValue({ deduplicated: false }),
+    }
+    const service = new MarlinMaterialService(
+      repository as unknown as MarlinMaterialRepository,
+      {} as MarlinOpenListService,
+    )
+    const html =
+      '<html><head><script>alert(1)</script></head><body><article><h1>标题</h1><p>正文 <strong>重点</strong></p><img src="https://example.com/a.png"></article></body></html>'
+
+    await service.import({
+      kind: 'html',
+      title: '网页',
+      content: html,
+      mimeType: 'text/html',
+      sourceType: 'url',
+      sourceRef: 'https://example.com',
+      metadata: {},
+    })
+
+    expect(repository.importFrozen).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originalContent: html,
+        content: expect.stringContaining('# 标题'),
+        contentHash: createHash('sha256').update(html).digest('hex'),
+      }),
+      expect.anything(),
+    )
+    expect(repository.importFrozen.mock.calls[0][0].content).not.toContain(
+      'alert(1)',
     )
   })
 

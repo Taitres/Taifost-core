@@ -98,7 +98,14 @@ export class MarlinWorkflowService {
         'Create a revision before requesting review',
       )
     }
-    const passcode = randomInt(0, 1_000_000).toString().padStart(6, '0')
+    const configuredPasscode = process.env.MARLIN_REVIEW_PASSCODE?.trim()
+    if (configuredPasscode && !/^\d{6}$/.test(configuredPasscode)) {
+      throw new BadRequestException(
+        'MARLIN_REVIEW_PASSCODE must contain exactly six digits',
+      )
+    }
+    const passcode =
+      configuredPasscode ?? randomInt(0, 1_000_000).toString().padStart(6, '0')
     const result = await this.repository.createReviewRequest({
       projectId,
       revisionId,
@@ -138,7 +145,7 @@ export class MarlinWorkflowService {
             `请审阅：${project.title}`,
             `修订版本：v${result.revision.version}`,
             `审阅地址：${reviewUrl}`,
-            `六位口令：${passcode}`,
+            '请使用站主另行提供的长期六位审批口令。',
             `有效期至：${result.request.expiresAt.toISOString()}`,
             '审阅通过不会自动发布，最终发布仍由站点所有者确认。',
           ].join('\n'),
@@ -165,7 +172,8 @@ export class MarlinWorkflowService {
       result.request
     return {
       request,
-      passcode,
+      passcode: configuredPasscode ? null : passcode,
+      passcodeConfigured: Boolean(configuredPasscode),
       reviewPath: `/studio/review/${request.id}`,
       emailDelivery,
     }

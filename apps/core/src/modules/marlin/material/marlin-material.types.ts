@@ -21,6 +21,7 @@ export interface MarlinFrozenMaterialInput {
   kind: MarlinMaterialImportInput['kind']
   title: string
   content: string
+  originalContent: string
   contentHash: string
   mimeType: string
   byteSize: number

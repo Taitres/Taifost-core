@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 
 import { Injectable } from '@nestjs/common'
+import { parseHTML } from 'linkedom'
 
 import { MarlinMaterialRepository } from './marlin-material.repository'
 import type { MarlinMaterialImportInput } from './marlin-material.types'
@@ -14,6 +15,102 @@ export class MarlinMaterialService {
     private readonly openList: MarlinOpenListService,
   ) {}
 
+  private htmlToMarkdown(html: string, baseUrl?: string) {
+    const { document } = parseHTML(html)
+    document
+      .querySelectorAll('script,style,noscript,template,iframe,svg,form')
+      .forEach((element) => element.remove())
+    const root =
+      document.querySelector('article') ||
+      document.querySelector('main') ||
+      document.body
+    if (!root) return ''
+
+    const render = (node: any): string => {
+      if (node.nodeType === 3) return String(node.textContent || '')
+      if (node.nodeType !== 1 && node !== root) return ''
+      const tag = String(node.localName || '').toLowerCase()
+      const inner = Array.from(node.childNodes || [], (child) => render(child))
+        .join('')
+        .trim()
+      if (!tag) return inner
+      if (/^h[1-6]$/.test(tag)) {
+        return `\n\n${'#'.repeat(Number(tag[1]))} ${inner}\n\n`
+      }
+      if (tag === 'p' || tag === 'section' || tag === 'div') {
+        return inner ? `\n\n${inner}\n\n` : ''
+      }
+      if (tag === 'br') return '\n'
+      if (tag === 'strong' || tag === 'b') return `**${inner}**`
+      if (tag === 'em' || tag === 'i') return `*${inner}*`
+      if (tag === 'code' && node.parentElement?.localName !== 'pre') {
+        return `\`${inner}\``
+      }
+      if (tag === 'pre')
+        return `\n\n\`\`\`\n${node.textContent || ''}\n\`\`\`\n\n`
+      if (tag === 'blockquote') {
+        return `\n\n${inner
+          .split('\n')
+          .map((line) => `> ${line}`)
+          .join('\n')}\n\n`
+      }
+      if (tag === 'li') return `\n- ${inner}`
+      if (tag === 'ul' || tag === 'ol') return `\n${inner}\n`
+      if (tag === 'hr') return '\n\n---\n\n'
+      if (tag === 'a') {
+        const href = node.getAttribute('href')
+        if (!href) return inner
+        try {
+          const url = new URL(href, baseUrl || 'https://invalid.local')
+          if (url.hostname === 'invalid.local') return inner
+          return ['http:', 'https:'].includes(url.protocol)
+            ? `[${inner || url.href}](${url.href})`
+            : inner
+        } catch {
+          return inner
+        }
+      }
+      if (tag === 'img') {
+        const src = node.getAttribute('src')
+        if (!src) return ''
+        try {
+          const url = new URL(src, baseUrl || 'https://invalid.local')
+          if (url.hostname === 'invalid.local') return ''
+          if (!['http:', 'https:'].includes(url.protocol)) return ''
+          return `![${node.getAttribute('alt') || ''}](${url.href})`
+        } catch {
+          return ''
+        }
+      }
+      return inner
+    }
+
+    return render(root)
+      .replaceAll(/[\t ]+\n/g, '\n')
+      .replaceAll(/\n{3,}/g, '\n\n')
+      .trim()
+  }
+
+  private normalizeContent(
+    kind: MarlinMaterialImportInput['kind'],
+    content: string,
+    baseUrl?: string,
+  ) {
+    if (kind === 'html' || kind === 'url') {
+      return this.htmlToMarkdown(content, baseUrl)
+    }
+    if (kind === 'json') {
+      let normalized = content
+      try {
+        normalized = JSON.stringify(JSON.parse(content), null, 2)
+      } catch {
+        // Preserve invalid JSON exactly inside a fenced block for inspection.
+      }
+      return `\`\`\`json\n${normalized}\n\`\`\``
+    }
+    return content
+  }
+
   import(input: MarlinMaterialImportInput) {
     const contentHash = createHash('sha256')
       .update(input.content, 'utf8')
@@ -23,7 +120,12 @@ export class MarlinMaterialService {
       {
         kind: input.kind,
         title: input.title,
-        content: input.content,
+        content: this.normalizeContent(
+          input.kind,
+          input.content,
+          input.sourceRef,
+        ),
+        originalContent: input.content,
         contentHash,
         mimeType: input.mimeType,
         byteSize: Buffer.byteLength(input.content, 'utf8'),
@@ -121,9 +223,7 @@ export class MarlinMaterialService {
       (match) => match[1],
     )
     const htmlImageUrls = Array.from(content.matchAll(/<img[^>]+>/gi))
-      .map((match) =>
-        match[0].match(/\ssrc=["'](https?:\/\/[^"']+)["']/i)?.[1],
-      )
+      .map((match) => match[0].match(/\ssrc=["'](https?:\/\/[^"']+)["']/i)?.[1])
       .filter((url): url is string => Boolean(url))
     const imageUrls = [...markdownImageUrls, ...htmlImageUrls]
     const allUrls = Array.from(
