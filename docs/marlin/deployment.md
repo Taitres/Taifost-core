@@ -42,9 +42,15 @@ curl -fsS http://127.0.0.1:2334/api/v3/health
 cd ../shiro-src
 CORE_API_URL=http://host.docker.internal:2334/api/v3 \
 CORE_CLIENT_API_URL=https://api.example.com/api/v3 \
+CORE_GATEWAY_URL=https://api.example.com \
 docker-compose -f docker-compose.marlin.yml up -d --build
 curl -fsS http://127.0.0.1:2324/robots.txt
 ```
+
+`CORE_API_URL` is used by Shiro inside the container. The two public variables
+are embedded into browser responses and must therefore use an address reachable
+from visitors' devices. Never set `CORE_CLIENT_API_URL` or `CORE_GATEWAY_URL`
+to `127.0.0.1`, `localhost`, or `host.docker.internal` in production.
 
 ## MongoDB to PostgreSQL
 
