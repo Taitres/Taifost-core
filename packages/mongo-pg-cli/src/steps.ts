@@ -1,4 +1,4 @@
-import { CollectionRefTypes } from '@mx-space/db-schema'
+import { CollectionRefTypes, parseEntityId } from '@mx-space/db-schema'
 import {
   accounts,
   activities,
@@ -36,30 +36,55 @@ import {
   webhooks,
 } from '@mx-space/db-schema/schema'
 
-import { allocateForCollection, createResolver } from './id-map'
+import { allocateForCollection, createResolver, remapId } from './id-map'
 import type { MigrationContext, MigrationStep } from './types'
 
-const upsert = async <T extends Record<string, unknown>>(
+const errorReason = (error: unknown): string => {
+  const messages: string[] = []
+  let current = error
+  const seen = new Set<unknown>()
+
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current)
+    if (current.message && !messages.includes(current.message)) {
+      messages.push(current.message)
+    }
+    current = current.cause
+  }
+
+  return messages.join(': ') || String(error)
+}
+
+export const upsertRows = async <T extends Record<string, unknown>>(
   ctx: MigrationContext,
   table: any,
   rows: T[],
 ) => {
   if (ctx.mode !== 'apply' || rows.length === 0) return
+  const tableName =
+    table[Symbol.for('drizzle:Name') as any]?.toString() ?? 'unknown'
   const chunkSize = 200
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize)
     try {
       await ctx.pg.insert(table).values(chunk).onConflictDoNothing()
-    } catch (err) {
-      ctx.reports.warnings.push({
-        collection:
-          table[Symbol.for('drizzle:Name') as any]?.toString() ?? 'unknown',
-        mongoId: 'batch',
-        reason: (err as Error).message,
-      })
+    } catch {
+      for (const row of chunk) {
+        try {
+          await ctx.pg.insert(table).values([row]).onConflictDoNothing()
+        } catch (error) {
+          ctx.reports.warnings.push({
+            collection: tableName,
+            mongoId: String(row.id ?? 'unknown'),
+            reason: errorReason(error),
+          })
+        }
+      }
     }
   }
 }
+
+const upsert = upsertRows
 
 const recordLoad = (ctx: MigrationContext, collection: string, n: number) => {
   ctx.reports.rowsLoaded[collection] =
@@ -268,6 +293,21 @@ export const stepCategories: MigrationStep = {
       createdAt: dateOrNull(d.created) ?? new Date(),
     }))
     await upsert(ctx, categories, rows)
+    if (ctx.mode === 'apply') {
+      const existingCategories = await ctx.pg
+        .select({ id: categories.id, slug: categories.slug })
+        .from(categories)
+      const idBySlug = new Map(
+        existingCategories.map((category) => [category.slug, category.id]),
+      )
+
+      for (const doc of docs) {
+        const existingId = idBySlug.get(doc.slug)
+        if (existingId && existingId !== resolver.self(doc._id)) {
+          await remapId(ctx, 'categories', doc._id, parseEntityId(existingId))
+        }
+      }
+    }
     recordLoad(ctx, 'categories', rows.length)
   },
 }

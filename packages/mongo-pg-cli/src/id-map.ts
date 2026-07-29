@@ -1,6 +1,6 @@
 import { type EntityId, parseEntityId } from '@mx-space/db-schema/id'
 import { mongoIdMap } from '@mx-space/db-schema/schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import type { ObjectId } from 'mongodb'
 
 import type { MigrationContext } from './types'
@@ -67,6 +67,31 @@ export async function persistIdMap(ctx: MigrationContext): Promise<void> {
       await ctx.pg.insert(mongoIdMap).values(chunk).onConflictDoNothing()
     }
   }
+}
+
+/**
+ * Repoint a source document at a row that already existed under the same
+ * natural key. This keeps later foreign-key resolution and resumed runs in
+ * sync when `onConflictDoNothing` encounters seeded data.
+ */
+export async function remapId(
+  ctx: MigrationContext,
+  collection: string,
+  mongoId: ObjectId | string,
+  targetId: EntityId,
+): Promise<void> {
+  const hex = mongoHexOf(mongoId)
+  if (!hex) return
+
+  ensureCollectionMap(ctx, collection).set(hex, targetId)
+  if (ctx.mode !== 'apply') return
+
+  await ctx.pg
+    .update(mongoIdMap)
+    .set({ snowflakeId: targetId })
+    .where(
+      and(eq(mongoIdMap.collection, collection), eq(mongoIdMap.mongoId, hex)),
+    )
 }
 
 /** Resolve a Mongo `_id` reference into the allocated Snowflake text ID. */

@@ -1,10 +1,11 @@
 import { parseEntityId } from '@mx-space/db-schema/id'
 import { describe, expect, it } from 'vitest'
 
-import { createResolver } from '../src/id-map'
+import { createResolver, remapId } from '../src/id-map'
 import {
   normalizeLegacyJsonbObject,
   resolveTranslationEntryLookupKey,
+  upsertRows,
 } from '../src/steps'
 import type { MigrationContext } from '../src/types'
 
@@ -67,6 +68,71 @@ describe('normalizeLegacyJsonbObject', () => {
         reason: 'meta must be a JSON object; received array',
       },
     ])
+  })
+})
+
+describe('upsertRows', () => {
+  it('falls back to individual rows when a batch insert fails', async () => {
+    const ctx = buildContext()
+    const inserted: string[] = []
+    const table = {
+      [Symbol.for('drizzle:Name')]: 'posts',
+    }
+
+    ctx.mode = 'apply'
+    ctx.pg = {
+      insert: () => ({
+        values: (rows: Array<{ id: string }>) => ({
+          onConflictDoNothing: async () => {
+            if (rows.length > 1) throw new Error('batch failed')
+            if (rows[0].id === 'bad') {
+              throw new Error('query failed', {
+                cause: new Error('invalid row'),
+              })
+            }
+            inserted.push(rows[0].id)
+          },
+        }),
+      }),
+    } as MigrationContext['pg']
+
+    await upsertRows(ctx, table, [{ id: 'good' }, { id: 'bad' }])
+
+    expect(inserted).toEqual(['good'])
+    expect(ctx.reports.warnings).toEqual([
+      {
+        collection: 'posts',
+        mongoId: 'bad',
+        reason: 'query failed: invalid row',
+      },
+    ])
+  })
+})
+
+describe('remapId', () => {
+  it('updates the in-memory resolver for natural-key conflicts', async () => {
+    const ctx = buildContext()
+    ctx.mode = 'dry-run'
+    ctx.idMap.set(
+      'categories',
+      new Map([['mongo-default', parseEntityId('1001')]]),
+    )
+
+    await remapId(
+      ctx,
+      'categories',
+      'mongo-default',
+      parseEntityId('2002'),
+    )
+
+    expect(
+      createResolver(ctx, 'posts').ref(
+        'categories',
+        'mongo-default',
+        'categoryId',
+        true,
+      ),
+    ).toBe('2002')
   })
 })
 
