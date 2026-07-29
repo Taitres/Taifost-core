@@ -2,7 +2,7 @@ x-marlin-env: &marlin-env
   TZ: ${TZ:-Asia/Shanghai}
   NODE_ENV: production
   PORT: "2333"
-  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-localhost:*,127.0.0.1:*}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-taitres.com,*.taitres.com,localhost:*,127.0.0.1:*}
   PG_HOST: marlin-postgres
   PG_PORT: "5432"
   PG_USER: ${PG_USER:-mx}
