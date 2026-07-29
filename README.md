@@ -4,6 +4,9 @@
 
 <h1 align="center">MX Space Core</h1>
 
+> [!NOTE]
+> **Taifost Core** is an independently maintained, heavily customized derivative of [mx-space/core](https://github.com/mx-space/core). It extends the upstream project for MARLIN.LOG workflows, PostgreSQL migration, and the Taifost frontend. Because its product direction and implementation will diverge substantially, it is published as a standalone repository rather than in GitHub's fork network.
+
 <p align="center">
   AI-powered CMS Core for personal blogs, creator homepages & content websites.
 </p>
