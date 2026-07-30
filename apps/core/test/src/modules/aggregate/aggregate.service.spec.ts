@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { CacheKeys } from '~/constants/cache.constant'
 import { AggregateService } from '~/modules/aggregate/aggregate.service'
 
 const noteRow = {
@@ -44,25 +45,40 @@ const createService = () => {
       { id: '7000000000000000400', content: 'noted' },
     ]),
   }
+  const redisService = {
+    deleteKeysByPattern: vi.fn(async () => 0),
+  }
 
   const service = new AggregateService(
-    postService as any,
-    noteService as any,
-    {} as any,
-    {} as any,
-    sayService as any,
-    {} as any,
-    {} as any,
-    recentlyService as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
-    {} as any,
+    postService as any, // postService
+    noteService as any, // noteService
+    {} as any, // categoryService
+    {} as any, // pageService
+    sayService as any, // sayService
+    {} as any, // commentService
+    {} as any, // linkService
+    recentlyService as any, // recentlyService
+    {} as any, // ownerService
+    {} as any, // configs
+    redisService as any, // redisService
+    {} as any, // analyzeService
+    {} as any, // webGateway
+    {} as any, // urlBuilder
   )
-  return { service }
+  return { redisService, service }
 }
+
+describe('AggregateService.cleanCache', () => {
+  it('clears query and locale variants of aggregate cache entries', async () => {
+    const { redisService, service } = createService()
+
+    await service.cleanCache()
+
+    expect(redisService.deleteKeysByPattern).toHaveBeenCalledWith(
+      `${CacheKeys.Aggregate}*`,
+    )
+  })
+})
 
 describe('AggregateService.topActivity', () => {
   it('omits article bodies but keeps the metadata the homepage renders', async () => {

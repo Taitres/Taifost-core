@@ -539,6 +539,9 @@ export class AggregateService {
 
   @OnEvent(EventBusEvents.CleanAggregateCache)
   async cleanCache() {
-    await this.redisService.getClient().del(CacheKeys.Aggregate)
+    // Aggregate endpoints opt into query-aware cache keys, e.g.
+    // `mx-api-cache:aggregate?<hash>#<lang>`. Deleting only the bare key leaves
+    // every themed/language response stale until its TTL expires.
+    await this.redisService.deleteKeysByPattern(`${CacheKeys.Aggregate}*`)
   }
 }
