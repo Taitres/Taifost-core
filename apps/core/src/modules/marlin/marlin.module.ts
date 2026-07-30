@@ -11,6 +11,8 @@ import { MarlinMaterialController } from './material/marlin-material.controller'
 import { MarlinMaterialRepository } from './material/marlin-material.repository'
 import { MarlinMaterialService } from './material/marlin-material.service'
 import { MarlinOpenListService } from './material/marlin-openlist.service'
+import { MarlinOpsController } from './ops/marlin-ops.controller'
+import { MarlinOpsService } from './ops/marlin-ops.service'
 import {
   MarlinPublicReviewController,
   MarlinWorkflowController,
@@ -26,6 +28,7 @@ import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
     MarlinPublicReviewController,
     MarlinHotspotController,
     MarlinAiController,
+    MarlinOpsController,
   ],
   providers: [
     MarlinMaterialRepository,
@@ -39,6 +42,7 @@ import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
     MarlinHotspotScheduler,
     MarlinAiRepository,
     MarlinAiService,
+    MarlinOpsService,
   ],
   exports: [
     MarlinMaterialRepository,

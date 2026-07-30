@@ -26,6 +26,48 @@ export class MarlinOpenListService {
     return { endpoint, token, directory, publicBase }
   }
 
+  async checkHealth() {
+    const startedAt = Date.now()
+    const config = this.getConfig()
+    if (!config.endpoint || !config.token) {
+      return {
+        configured: false,
+        reachable: false,
+        latencyMs: Date.now() - startedAt,
+        message: 'OpenList is not configured',
+      }
+    }
+
+    try {
+      const response = await fetch(`${config.endpoint}/api/me`, {
+        headers: { authorization: config.token },
+        signal: AbortSignal.timeout(5_000),
+      })
+      const result = (await response.json().catch(() => null)) as {
+        code?: number
+        message?: string
+      } | null
+      const reachable =
+        response.ok && (result?.code == null || result.code === 200)
+      return {
+        configured: true,
+        reachable,
+        latencyMs: Date.now() - startedAt,
+        message: reachable
+          ? 'OpenList API is reachable'
+          : result?.message || `OpenList returned HTTP ${response.status}`,
+      }
+    } catch (error) {
+      return {
+        configured: true,
+        reachable: false,
+        latencyMs: Date.now() - startedAt,
+        message:
+          error instanceof Error ? error.message : 'OpenList request failed',
+      }
+    }
+  }
+
   async archiveRemoteImage(sourceUrl: string) {
     const config = this.getConfig()
     if (!config.endpoint || !config.token || !config.publicBase) {
