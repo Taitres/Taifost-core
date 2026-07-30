@@ -14,22 +14,103 @@ const safeName = (value: string) =>
 
 @Injectable()
 export class MarlinOpenListService {
+  private credentialToken?: string
+  private credentialTokenPromise?: Promise<string>
+
   private getConfig() {
     const endpoint = process.env.MARLIN_OPENLIST_URL?.replace(/\/+$/, '')
     const token = process.env.MARLIN_OPENLIST_TOKEN
+    const username = process.env.MARLIN_OPENLIST_USERNAME
+    const password = process.env.MARLIN_OPENLIST_PASSWORD
     const directory = `/${(
       process.env.MARLIN_OPENLIST_DIRECTORY || 'marlin/assets'
     ).replaceAll(/^\/+|\/+$/g, '')}`
     const publicBase = (
       process.env.MARLIN_OPENLIST_PUBLIC_URL || endpoint
     )?.replace(/\/+$/, '')
-    return { endpoint, token, directory, publicBase }
+    return { endpoint, token, username, password, directory, publicBase }
+  }
+
+  private async resolveToken(
+    config: ReturnType<MarlinOpenListService['getConfig']>,
+    force = false,
+  ) {
+    if (config.token) return config.token
+    if (!config.endpoint || !config.username || !config.password) {
+      throw new Error(
+        'OpenList is not configured (TOKEN or USERNAME/PASSWORD required)',
+      )
+    }
+    if (force) {
+      this.credentialToken = undefined
+      this.credentialTokenPromise = undefined
+    }
+    if (this.credentialToken) return this.credentialToken
+    if (this.credentialTokenPromise) return this.credentialTokenPromise
+
+    const login = (async () => {
+      const response = await fetch(`${config.endpoint}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          username: config.username,
+          password: config.password,
+          otp_code: '',
+        }),
+        signal: AbortSignal.timeout(5_000),
+      })
+      const result = (await response.json().catch(() => null)) as {
+        code?: number
+        message?: string
+        data?: { token?: string }
+      } | null
+      const token = result?.data?.token
+      if (
+        !response.ok ||
+        (result?.code != null && result.code !== 200) ||
+        !token
+      ) {
+        throw new Error(
+          result?.message || `OpenList login returned HTTP ${response.status}`,
+        )
+      }
+      this.credentialToken = token
+      return token
+    })()
+    this.credentialTokenPromise = login
+    try {
+      return await login
+    } finally {
+      this.credentialTokenPromise = undefined
+    }
+  }
+
+  private async fetchAuthorized(
+    config: ReturnType<MarlinOpenListService['getConfig']>,
+    path: string,
+    init: RequestInit = {},
+  ) {
+    const request = async (force = false) => {
+      const token = await this.resolveToken(config, force)
+      const headers = new Headers(init.headers)
+      headers.set('authorization', token)
+      return fetch(`${config.endpoint}${path}`, {
+        ...init,
+        headers,
+      })
+    }
+    const response = await request()
+    if (response.status === 401 && !config.token) return request(true)
+    return response
   }
 
   async checkHealth() {
     const startedAt = Date.now()
     const config = this.getConfig()
-    if (!config.endpoint || !config.token) {
+    if (
+      !config.endpoint ||
+      (!config.token && !(config.username && config.password))
+    ) {
       return {
         configured: false,
         reachable: false,
@@ -39,8 +120,7 @@ export class MarlinOpenListService {
     }
 
     try {
-      const response = await fetch(`${config.endpoint}/api/me`, {
-        headers: { authorization: config.token },
+      const response = await this.fetchAuthorized(config, '/api/me', {
         signal: AbortSignal.timeout(5_000),
       })
       const result = (await response.json().catch(() => null)) as {
@@ -70,8 +150,14 @@ export class MarlinOpenListService {
 
   async archiveRemoteImage(sourceUrl: string) {
     const config = this.getConfig()
-    if (!config.endpoint || !config.token || !config.publicBase) {
-      throw new Error('OpenList is not configured (MARLIN_OPENLIST_URL/TOKEN)')
+    if (
+      !config.endpoint ||
+      (!config.token && !(config.username && config.password)) ||
+      !config.publicBase
+    ) {
+      throw new Error(
+        'OpenList is not configured (URL, credentials and PUBLIC_URL required)',
+      )
     }
 
     const remote = await fetchPublicRemote(sourceUrl, {
@@ -92,10 +178,9 @@ export class MarlinOpenListService {
       String(now.getUTCMonth() + 1).padStart(2, '0'),
       `${digest.slice(0, 16)}-${safeName(sourceName)}`,
     )
-    const response = await fetch(`${config.endpoint}/api/fs/put`, {
+    const response = await this.fetchAuthorized(config, '/api/fs/put', {
       method: 'PUT',
       headers: {
-        authorization: config.token,
         'content-type': remote.contentType,
         'file-path': encodeURIComponent(objectPath),
       },

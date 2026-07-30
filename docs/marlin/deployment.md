@@ -21,12 +21,19 @@ MARLIN_REVIEW_PASSCODE=123456
 
 # OpenList image archive
 MARLIN_OPENLIST_URL=https://openlist.example.com
+# Use either a long-lived API token or the OpenList account credentials.
 MARLIN_OPENLIST_TOKEN=replace-with-openlist-token
+MARLIN_OPENLIST_USERNAME=
+MARLIN_OPENLIST_PASSWORD=
 MARLIN_OPENLIST_DIRECTORY=marlin/assets
 MARLIN_OPENLIST_PUBLIC_URL=https://openlist.example.com
 ```
 
-`MARLIN_OPENLIST_TOKEN` must be able to upload to the configured directory.
+`MARLIN_OPENLIST_TOKEN`, or the account selected by
+`MARLIN_OPENLIST_USERNAME`/`MARLIN_OPENLIST_PASSWORD`, must be able to upload
+to the configured directory. Credential authentication obtains and caches an
+OpenList API token in process memory; the password is never returned by the
+health endpoint or written to application logs.
 Image archive failures remain visible in the material and media library. They
 put the material into `pending`, which blocks creation until a retry succeeds
 or the owner explicitly selects **Ignore images and continue**.
