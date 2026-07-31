@@ -1,8 +1,11 @@
 import { Module } from '@nestjs/common'
 
+import { AiModule } from '../ai/ai.module'
 import { MarlinAiController } from './ai/marlin-ai.controller'
 import { MarlinAiRepository } from './ai/marlin-ai.repository'
 import { MarlinAiService } from './ai/marlin-ai.service'
+import { MarlinComposeController } from './compose/marlin-compose.controller'
+import { MarlinComposeService } from './compose/marlin-compose.service'
 import { MarlinHotspotController } from './hotspot/marlin-hotspot.controller'
 import { MarlinHotspotRepository } from './hotspot/marlin-hotspot.repository'
 import { MarlinHotspotScheduler } from './hotspot/marlin-hotspot.scheduler'
@@ -22,7 +25,9 @@ import { MarlinWorkflowScheduler } from './workflow/marlin-workflow.scheduler'
 import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
 
 @Module({
+  imports: [AiModule],
   controllers: [
+    MarlinComposeController,
     MarlinMaterialController,
     MarlinWorkflowController,
     MarlinPublicReviewController,
@@ -31,6 +36,7 @@ import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
     MarlinOpsController,
   ],
   providers: [
+    MarlinComposeService,
     MarlinMaterialRepository,
     MarlinMaterialService,
     MarlinOpenListService,

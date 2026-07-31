@@ -293,6 +293,30 @@ export class MarlinWorkflowService {
     })
   }
 
+  /**
+   * Personal publishing path: the owner explicitly clicks Publish, while the
+   * internal approval pointer remains an implementation detail.
+   */
+  async publishCurrent(projectId: string, input: { scheduledAt?: Date }) {
+    const project = await this.repository.findProject(projectId)
+    if (!project) throw new NotFoundException('MARLIN project not found')
+    if (!project.currentRevisionId) {
+      throw new BadRequestException('Save the article before publishing')
+    }
+    const revisionId = String(project.currentRevisionId)
+    const approved = await this.repository.approveCurrentRevision(
+      projectId,
+      revisionId,
+    )
+    if (!approved) {
+      throw new ConflictException('The current article changed; please retry')
+    }
+    return this.publish(projectId, {
+      revisionId,
+      scheduledAt: input.scheduledAt,
+    })
+  }
+
   async publishDue() {
     const publications = await this.repository.findScheduledPublications(
       new Date(),

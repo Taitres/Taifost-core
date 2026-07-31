@@ -176,4 +176,55 @@ describe('MarlinMaterialService', () => {
     )
     expect(result?.reused).toBe(false)
   })
+
+  it('archives reachable images while silently ignoring only failed images', async () => {
+    const repository = {
+      findById: vi.fn().mockResolvedValue({
+        id: '1',
+        status: 'ready',
+        content:
+          '![成功](https://example.com/ok.png)\n![失败](https://example.com/bad.png)',
+        analysis: null,
+      }),
+      updateAnalysis: vi
+        .fn()
+        .mockImplementation(async (_id, analysis, status, content) => ({
+          id: '1',
+          analysis,
+          status,
+          content,
+        })),
+    }
+    const openList = {
+      archiveRemoteImage: vi.fn().mockImplementation(async (sourceUrl) => {
+        if (sourceUrl.includes('bad.png')) throw new Error('unreachable')
+        return {
+          sourceUrl,
+          archivedUrl: 'https://media.example.com/ok.png',
+          status: 'archived',
+        }
+      }),
+    }
+    const service = new MarlinMaterialService(
+      repository as unknown as MarlinMaterialRepository,
+      openList as unknown as MarlinOpenListService,
+    )
+
+    const result = await service.analyze('1', {
+      force: false,
+      archiveImages: true,
+      ignoreFailedImages: true,
+    })
+
+    expect(result?.analysis.media).toEqual([
+      expect.objectContaining({ status: 'archived' }),
+      { sourceUrl: 'https://example.com/bad.png', status: 'ignored' },
+    ])
+    expect(repository.updateAnalysis).toHaveBeenCalledWith(
+      '1',
+      expect.anything(),
+      'analyzed',
+      expect.stringContaining('https://media.example.com/ok.png'),
+    )
+  })
 })

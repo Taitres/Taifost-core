@@ -291,29 +291,29 @@ export class MarlinMaterialService {
     }
 
     const derived = this.buildAnalysis(material.content)
-    const media = options.ignoreFailedImages
-      ? derived.imageUrls.map((sourceUrl) => ({
+    const media = options.archiveImages
+      ? await Promise.all(
+          derived.imageUrls.map(async (sourceUrl) => {
+            try {
+              return await this.openList.archiveRemoteImage(sourceUrl)
+            } catch (error) {
+              return options.ignoreFailedImages
+                ? { sourceUrl, status: 'ignored' as const }
+                : {
+                    sourceUrl,
+                    status: 'failed' as const,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  }
+            }
+          }),
+        )
+      : derived.imageUrls.map((sourceUrl) => ({
           sourceUrl,
-          status: 'ignored' as const,
+          status: options.ignoreFailedImages
+            ? ('ignored' as const)
+            : ('pending' as const),
         }))
-      : options.archiveImages
-        ? await Promise.all(
-            derived.imageUrls.map(async (sourceUrl) => {
-              try {
-                return await this.openList.archiveRemoteImage(sourceUrl)
-              } catch (error) {
-                return {
-                  sourceUrl,
-                  status: 'failed' as const,
-                  error: error instanceof Error ? error.message : String(error),
-                }
-              }
-            }),
-          )
-        : derived.imageUrls.map((sourceUrl) => ({
-            sourceUrl,
-            status: 'pending' as const,
-          }))
     const analysis = {
       version: 1,
       generatedAt: new Date().toISOString(),
@@ -330,13 +330,14 @@ export class MarlinMaterialService {
           : content,
       material.content,
     )
-    const fullyLocalized =
-      media.length > 0 && media.every(({ status }) => status === 'archived')
+    const fullyResolved =
+      media.length > 0 &&
+      media.every(({ status }) => ['archived', 'ignored'].includes(status))
     const updated = await this.repository.updateAnalysis(
       id,
       analysis,
       hasUnresolvedMedia ? 'pending' : 'analyzed',
-      fullyLocalized ? localizedContent : undefined,
+      fullyResolved ? localizedContent : undefined,
     )
     return { material: updated, analysis, reused: false }
   }

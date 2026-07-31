@@ -12,6 +12,7 @@ const createService = () => {
     attachMaterials: vi.fn(),
     createReviewRequest: vi.fn(),
     createPublication: vi.fn(),
+    approveCurrentRevision: vi.fn(),
     decideReview: vi.fn(),
     findProject: vi.fn(),
     findPublishedRevision: vi.fn(),
@@ -299,5 +300,51 @@ describe('MarlinWorkflowService', () => {
       status: 'published',
       corePostId: 'post-1',
     })
+  })
+
+  it('publishes the current personal draft without exposing approval steps', async () => {
+    const { postService, repository, service } = createService()
+    repository.findProject
+      .mockResolvedValueOnce({
+        id: 'project-1',
+        currentRevisionId: 'revision-2',
+      })
+      .mockResolvedValueOnce({
+        id: 'project-1',
+        approvedRevisionId: 'revision-2',
+      })
+    repository.approveCurrentRevision.mockResolvedValue({
+      id: 'project-1',
+      approvedRevisionId: 'revision-2',
+    })
+    repository.findPublishedRevision.mockResolvedValue({
+      project: {
+        id: 'project-1',
+        approvedRevisionId: 'revision-2',
+        corePostId: null,
+      },
+      revision: {
+        id: 'revision-2',
+        version: 2,
+        title: 'Article',
+        slug: 'article',
+        summary: null,
+        content: '# Article',
+        categoryId: 'category-1',
+        tags: [],
+        copyright: true,
+        metadata: {},
+      },
+    })
+    postService.create.mockResolvedValue({ id: 'post-1' })
+    repository.createPublication.mockResolvedValue({ id: 'publication-1' })
+
+    await service.publishCurrent('project-1', {})
+
+    expect(repository.approveCurrentRevision).toHaveBeenCalledWith(
+      'project-1',
+      'revision-2',
+    )
+    expect(postService.create).toHaveBeenCalledOnce()
   })
 })

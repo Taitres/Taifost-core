@@ -230,6 +230,29 @@ export class MarlinWorkflowRepository extends BaseRepository {
     return row ?? null
   }
 
+  async approveCurrentRevision(
+    projectIdInput: string,
+    revisionIdInput: string,
+  ) {
+    const projectId = this.toDbId(projectIdInput)
+    const revisionId = this.toDbId(revisionIdInput)
+    const [row] = await this.db
+      .update(marlinProjects)
+      .set({
+        status: 'approved',
+        approvedRevisionId: revisionId,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(marlinProjects.id, projectId),
+          eq(marlinProjects.currentRevisionId, revisionId),
+        ),
+      )
+      .returning()
+    return row ?? null
+  }
+
   async createReviewRequest(input: {
     projectId: string
     revisionId: string

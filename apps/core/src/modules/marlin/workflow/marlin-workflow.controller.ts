@@ -91,6 +91,11 @@ export class MarlinWorkflowController {
     return this.service.publish(id, body)
   }
 
+  @Post('/:id/publish-current')
+  publishCurrent(@Param() { id }: EntityIdDto, @Body() body: MarlinPublishDto) {
+    return this.service.publishCurrent(id, body)
+  }
+
   @Post('/:id/withdraw')
   withdraw(@Param() { id }: EntityIdDto) {
     return this.service.withdraw(id)
