@@ -767,6 +767,18 @@ const AIProviderConfigSchema = withMeta(
       description: 'Unique identifier, e.g. "openai-main", "deepseek"',
     }),
     name: field.plain(z.string().min(1), 'Display name'),
+    adapter: field.plain(
+      z
+        .enum([
+          'openai',
+          'deepseek',
+          'openrouter',
+          'anthropic',
+          'openai-compatible',
+        ])
+        .optional(),
+      'Provider adapter',
+    ),
     type: field.plain(z.enum(AIProviderType), 'Provider type', {
       description: 'openai | openai-compatible | anthropic | openrouter',
     }),

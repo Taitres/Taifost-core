@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common'
 import { describe, expect, it, vi } from 'vitest'
 
+import { RequestCaseNormalizationPipe } from '~/common/pipes/case-normalization.pipe'
 import type { ConfigsService } from '~/modules/configs/configs.service'
 import type { MarlinAiRepository } from '~/modules/marlin/ai/marlin-ai.repository'
 import {
@@ -14,6 +15,44 @@ import {
 import type { MarlinWorkflowRepository } from '~/modules/marlin/workflow/marlin-workflow.repository'
 
 describe('parseMarlinAiAdvice', () => {
+  it('accepts the nested snake_case payload sent by Studio', () => {
+    const normalized = new RequestCaseNormalizationPipe().transform(
+      {
+        providers: [
+          {
+            id: 'main',
+            name: '主模型',
+            type: 'openai-compatible',
+            api_key: 'secret',
+            default_model: 'model-1',
+            enabled: true,
+          },
+        ],
+        default_provider_id: 'main',
+        default_model: 'model-1',
+        assignments: {
+          material_analysis: {
+            provider_id: 'main',
+            model: 'model-1',
+          },
+        },
+      },
+      { type: 'body', metatype: undefined, data: undefined },
+    )
+
+    expect(MarlinUnifiedAiConfigSchema.parse(normalized)).toMatchObject({
+      providers: [
+        expect.objectContaining({
+          apiKey: 'secret',
+          defaultModel: 'model-1',
+        }),
+      ],
+      assignments: {
+        materialAnalysis: { providerId: 'main', model: 'model-1' },
+      },
+    })
+  })
+
   it('accepts the fixed quick-rewriter workflow slot', () => {
     expect(
       MarlinAiAdviceSchema.parse({
@@ -117,5 +156,77 @@ describe('parseMarlinAiAdvice', () => {
       defaultProviderId: 'main',
       defaultModel: 'model-1',
     })
+  })
+
+  it('preserves an existing provider credential when Studio sends an empty key', async () => {
+    let aiConfig: Record<string, any> = {
+      providers: [
+        {
+          id: 'main',
+          name: '主模型',
+          type: 'openai-compatible',
+          apiKey: 'persisted-secret',
+          endpoint: 'https://api.deepseek.com',
+          defaultModel: 'deepseek-chat',
+          enabled: true,
+        },
+      ],
+    }
+    const repository = {
+      listRoles: vi.fn().mockResolvedValue([]),
+      upsertRole: vi.fn().mockImplementation(async (role) => role),
+    }
+    const configs = {
+      get: vi.fn().mockImplementation(async () => aiConfig),
+      getForResponse: vi.fn().mockImplementation(async () => ({
+        ...aiConfig,
+        providers: aiConfig.providers.map((provider: any) => ({
+          ...provider,
+          apiKey: '',
+        })),
+      })),
+      patchAndValid: vi.fn().mockImplementation(async (_key, patch) => {
+        aiConfig = { ...aiConfig, ...patch }
+        return aiConfig
+      }),
+    }
+    const service = new MarlinAiService(
+      repository as unknown as MarlinAiRepository,
+      {} as MarlinWorkflowRepository,
+      configs as unknown as ConfigsService,
+    )
+
+    await service.saveUnifiedConfig(
+      MarlinUnifiedAiConfigSchema.parse({
+        providers: [
+          {
+            id: 'main',
+            name: '主模型',
+            adapter: 'deepseek',
+            type: 'openai-compatible',
+            apiKey: '',
+            defaultModel: 'deepseek-chat',
+            enabled: true,
+          },
+        ],
+        defaultProviderId: 'main',
+        defaultModel: 'deepseek-chat',
+        assignments: {},
+      }),
+    )
+
+    expect(configs.patchAndValid).toHaveBeenCalledWith(
+      'ai',
+      expect.objectContaining({
+        providers: [
+          expect.objectContaining({
+            adapter: 'deepseek',
+            apiKey: 'persisted-secret',
+            endpoint: 'https://api.deepseek.com',
+            appendV1: true,
+          }),
+        ],
+      }),
+    )
   })
 })

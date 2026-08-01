@@ -5,7 +5,10 @@ import {
   NotFoundException,
 } from '@nestjs/common'
 
-import { createModelRuntime } from '~/modules/ai/runtime'
+import {
+  createModelRuntime,
+  resolveAIProviderAdapter,
+} from '~/modules/ai/runtime'
 import type { AIConfig } from '~/modules/configs/configs.schema'
 import { ConfigsService } from '~/modules/configs/configs.service'
 
@@ -206,13 +209,25 @@ export class MarlinAiService {
       throw new BadRequestException('Choose an enabled default AI provider')
     }
 
-    const providers = selectedDefault
+    const normalizedProviders = input.providers.map((provider) => {
+      const existing = current.providers?.find(({ id }) => id === provider.id)
+      return resolveAIProviderAdapter({
+        ...provider,
+        apiKey: provider.apiKey || existing?.apiKey || '',
+      })
+    })
+    const normalizedDefault = selectedDefault
+      ? normalizedProviders.find(({ id }) => id === selectedDefault.id)
+      : undefined
+    const providers = normalizedDefault
       ? [
           {
-            ...selectedDefault,
-            defaultModel: input.defaultModel || selectedDefault.defaultModel,
+            ...normalizedDefault,
+            defaultModel: input.defaultModel || normalizedDefault.defaultModel,
           },
-          ...input.providers.filter(({ id }) => id !== selectedDefault.id),
+          ...normalizedProviders.filter(
+            ({ id }) => id !== normalizedDefault.id,
+          ),
         ]
       : []
     const defaultAssignment = selectedDefault

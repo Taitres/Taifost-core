@@ -2,6 +2,7 @@ import { createZodDto } from 'nestjs-zod'
 import { z } from 'zod'
 
 import { AIProviderType } from '~/modules/ai/ai.types'
+import { camelcaseKeys } from '~/utils/tool.util'
 
 export const marlinAiSlots = [
   'material-analyst',
@@ -60,6 +61,15 @@ export const MarlinAiAssignmentSchema = z.object({
 export const MarlinUnifiedAiProviderSchema = z.object({
   id: z.string().trim().min(1).max(200),
   name: z.string().trim().min(1).max(200),
+  adapter: z
+    .enum([
+      'openai',
+      'deepseek',
+      'openrouter',
+      'anthropic',
+      'openai-compatible',
+    ])
+    .optional(),
   type: z.nativeEnum(AIProviderType),
   apiKey: z.string().trim().max(20_000).default(''),
   endpoint: z.string().trim().max(2_000).optional(),
@@ -82,12 +92,20 @@ const MarlinAiTaskAssignmentsSchema = z
   )
   .default({})
 
-export const MarlinUnifiedAiConfigSchema = z.object({
+const MarlinUnifiedAiConfigObjectSchema = z.object({
   providers: z.array(MarlinUnifiedAiProviderSchema).max(20),
   defaultProviderId: z.string().trim().min(1).max(200).optional(),
   defaultModel: z.string().trim().min(1).max(300).optional(),
   assignments: MarlinAiTaskAssignmentsSchema,
 })
+
+// Studio consumes snake_case responses and sends that shape back. Core's
+// global body normalization is deliberately shallow to protect free-form JSON,
+// so this structured module owns deep normalization at its own seam.
+export const MarlinUnifiedAiConfigSchema = z.preprocess(
+  (value) => camelcaseKeys(value),
+  MarlinUnifiedAiConfigObjectSchema,
+)
 
 export const MarlinAiProviderQuerySchema = z.object({
   providerId: z.string().trim().min(1).max(200),

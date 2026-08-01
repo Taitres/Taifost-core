@@ -1,4 +1,5 @@
 export * from './ai-provider.factory'
+export * from './ai-provider-adapter.registry'
 export * from './model-runtime.interface'
 export {
   isContextOverflow,

@@ -2,6 +2,7 @@ import { Body, Get, Param, Post, Put, Query } from '@nestjs/common'
 
 import { ApiController } from '~/common/decorators/api-controller.decorator'
 import { Auth } from '~/common/decorators/auth.decorator'
+import { listAIProviderAdapters } from '~/modules/ai/runtime'
 import { EntityIdDto } from '~/shared/dto/id.dto'
 
 import { MarlinAiRepository } from './marlin-ai.repository'
@@ -29,6 +30,11 @@ export class MarlinAiController {
   @Get('/config')
   config() {
     return this.service.getUnifiedConfig()
+  }
+
+  @Get('/config/adapters')
+  adapters() {
+    return { adapters: listAIProviderAdapters() }
   }
 
   @Put('/config')

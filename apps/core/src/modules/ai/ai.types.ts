@@ -4,6 +4,9 @@ export enum AIProviderType {
   Generic = 'generic',
 }
 
+export type AIProviderAdapterId =
+  'openai' | 'deepseek' | 'openrouter' | 'anthropic' | 'openai-compatible'
+
 export enum AIFeatureKey {
   Summary = 'summary',
   Writer = 'writer',
@@ -19,6 +22,8 @@ export interface AIProviderConfig {
   id: string
   /** Display name */
   name: string
+  /** Backend-owned adapter profile. Older configurations are inferred. */
+  adapter?: AIProviderAdapterId
   /** Provider type */
   type: AIProviderType
   /** API key */

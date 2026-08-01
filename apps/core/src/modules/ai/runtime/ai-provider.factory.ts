@@ -1,5 +1,6 @@
 import type { AIProviderConfig } from '../ai.types'
 import { AIProviderType } from '../ai.types'
+import { resolveAIProviderAdapter } from './ai-provider-adapter.registry'
 import type { IModelRuntime } from './model-runtime.interface'
 import { PiRuntimeAdapter } from './pi-runtime.adapter'
 import type { RuntimeConfig } from './types'
@@ -8,31 +9,35 @@ export function createModelRuntime(
   config: AIProviderConfig,
   modelOverride?: string,
 ): IModelRuntime {
-  const model = modelOverride || config.defaultModel
+  if (!Object.values(AIProviderType).includes(config.type)) {
+    throw new Error(`Unsupported provider type: ${config.type as string}`)
+  }
+  const resolved = resolveAIProviderAdapter(config)
+  const model = modelOverride || resolved.defaultModel
 
   const runtimeConfig: RuntimeConfig = {
-    apiKey: config.apiKey,
-    endpoint: config.endpoint,
-    modelListUrl: config.modelListUrl,
-    appendV1: config.appendV1,
+    apiKey: resolved.apiKey,
+    endpoint: resolved.endpoint,
+    modelListUrl: resolved.modelListUrl,
+    appendV1: resolved.appendV1,
     model,
-    providerType: config.type,
-    providerId: config.id,
+    providerType: resolved.type,
+    providerId: resolved.id,
   }
 
-  switch (config.type) {
+  switch (resolved.type) {
     case AIProviderType.Anthropic:
     case AIProviderType.OpenAICompatible:
     case AIProviderType.Generic: {
       return new PiRuntimeAdapter({
         ...runtimeConfig,
-        contextWindow: config.contextWindow ?? undefined,
-        maxTokens: config.maxTokens ?? undefined,
+        contextWindow: resolved.contextWindow ?? undefined,
+        maxTokens: resolved.maxTokens ?? undefined,
       })
     }
 
     default: {
-      throw new Error(`Unsupported provider type: ${config.type as string}`)
+      throw new Error(`Unsupported provider type: ${resolved.type as string}`)
     }
   }
 }

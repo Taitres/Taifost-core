@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
 
 import { AIProviderType } from '~/modules/ai/ai.types'
-import { createModelRuntime } from '~/modules/ai/runtime'
+import {
+  createModelRuntime,
+  resolveAIProviderAdapter,
+} from '~/modules/ai/runtime'
 import { PiRuntimeAdapter } from '~/modules/ai/runtime/pi-runtime.adapter'
 
 interface AdapterInternals {
@@ -14,6 +17,47 @@ function inspect(adapter: unknown): AdapterInternals {
 }
 
 describe('createModelRuntime — enum coverage', () => {
+  it('uses the backend OpenRouter adapter profile instead of client transport fields', () => {
+    const provider = resolveAIProviderAdapter({
+      id: 'router',
+      name: 'Router',
+      adapter: 'openrouter',
+      type: AIProviderType.Generic,
+      apiKey: 'secret',
+      endpoint: 'https://wrong.example.com',
+      appendV1: true,
+      defaultModel: 'anthropic/claude-sonnet-4',
+      enabled: true,
+    })
+
+    expect(provider).toMatchObject({
+      adapter: 'openrouter',
+      type: AIProviderType.OpenAICompatible,
+      endpoint: 'https://openrouter.ai/api/v1',
+      appendV1: false,
+    })
+  })
+
+  it('keeps endpoint controls on the custom compatible adapter', () => {
+    const provider = resolveAIProviderAdapter({
+      id: 'local',
+      name: 'Local',
+      adapter: 'openai-compatible',
+      type: AIProviderType.OpenAICompatible,
+      apiKey: 'secret',
+      endpoint: 'http://127.0.0.1:11434/api',
+      appendV1: false,
+      defaultModel: 'local-model',
+      enabled: true,
+    })
+
+    expect(provider).toMatchObject({
+      endpoint: 'http://127.0.0.1:11434/api',
+      appendV1: false,
+      defaultModel: 'local-model',
+    })
+  })
+
   it('constructs PiRuntimeAdapter with openai-completions api for OpenAICompatible', () => {
     const runtime = createModelRuntime({
       id: 'deepseek',
