@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
 
-import { Injectable } from '@nestjs/common'
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common'
 import { parseHTML } from 'linkedom'
 
 import { MarlinMaterialRepository } from './marlin-material.repository'
@@ -137,6 +141,17 @@ export class MarlinMaterialService {
         metadata: input.metadata,
       },
     )
+  }
+
+  async delete(id: string, detach: boolean) {
+    const result = await this.repository.delete(id, detach)
+    if (!result) throw new NotFoundException('Material not found')
+    if (!result.deleted) {
+      throw new ConflictException(
+        `Material is attached to ${result.attachedProjects} project(s); confirm detaching it before deletion`,
+      )
+    }
+    return { id: result.material.id, deleted: true, detached: result.detached }
   }
 
   async importUrl(input: {

@@ -5,6 +5,7 @@ import { PG_DB_TOKEN } from '~/constants/system.constant'
 import {
   marlinMaterialImports,
   marlinMaterials,
+  marlinProjectMaterials,
   pages,
   posts,
 } from '~/database/schema'
@@ -127,6 +128,45 @@ export class MarlinMaterialRepository extends BaseRepository {
       .orderBy(desc(marlinMaterialImports.createdAt))
 
     return { ...material, imports }
+  }
+
+  async delete(id: string, detach: boolean) {
+    const materialId = this.toDbId(id)
+    return this.db.transaction(async (tx) => {
+      const [material] = await tx
+        .select()
+        .from(marlinMaterials)
+        .where(eq(marlinMaterials.id, materialId))
+        .limit(1)
+        .for('update')
+      if (!material) return null
+
+      const [{ count }] = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(marlinProjectMaterials)
+        .where(eq(marlinProjectMaterials.materialId, materialId))
+      const attachedProjects = Number(count ?? 0)
+      if (attachedProjects > 0 && !detach) {
+        return {
+          material,
+          deleted: false as const,
+          detached: 0,
+          attachedProjects,
+        }
+      }
+      if (attachedProjects > 0) {
+        await tx
+          .delete(marlinProjectMaterials)
+          .where(eq(marlinProjectMaterials.materialId, materialId))
+      }
+      await tx.delete(marlinMaterials).where(eq(marlinMaterials.id, materialId))
+      return {
+        material,
+        deleted: true as const,
+        detached: attachedProjects,
+        attachedProjects,
+      }
+    })
   }
 
   async listMedia() {

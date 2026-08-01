@@ -51,6 +51,33 @@ export class MarlinWorkflowRepository extends BaseRepository {
     return row ?? null
   }
 
+  async deleteProject(id: string) {
+    const projectId = this.toDbId(id)
+    return this.db.transaction(async (tx) => {
+      const [project] = await tx
+        .select()
+        .from(marlinProjects)
+        .where(eq(marlinProjects.id, projectId))
+        .limit(1)
+        .for('update')
+      if (!project) return null
+
+      // Review decisions cascade from requests. Requests and publications must
+      // be removed before the project cascade reaches their restricted revision.
+      await tx
+        .delete(marlinReviewRequests)
+        .where(eq(marlinReviewRequests.projectId, projectId))
+      await tx
+        .delete(marlinPublications)
+        .where(eq(marlinPublications.projectId, projectId))
+      const [deleted] = await tx
+        .delete(marlinProjects)
+        .where(eq(marlinProjects.id, projectId))
+        .returning()
+      return deleted ?? null
+    })
+  }
+
   async listProjects(
     input: MarlinProjectListInput,
   ): Promise<PaginationResult<typeof marlinProjects.$inferSelect>> {

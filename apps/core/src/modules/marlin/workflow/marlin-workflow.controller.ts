@@ -1,6 +1,8 @@
 import {
   Body,
+  Delete,
   Get,
+  HttpCode,
   NotFoundException,
   Param,
   Patch,
@@ -60,6 +62,12 @@ export class MarlinWorkflowController {
   @Patch('/:id')
   patch(@Param() { id }: EntityIdDto, @Body() body: MarlinProjectPatchDto) {
     return this.service.patchProject(id, body)
+  }
+
+  @Delete('/:id')
+  @HttpCode(200)
+  delete(@Param() { id }: EntityIdDto) {
+    return this.service.deleteProject(id)
   }
 
   @Post('/:id/materials')

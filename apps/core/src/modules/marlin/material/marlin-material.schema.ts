@@ -48,6 +48,13 @@ export const MarlinMaterialAnalyzeSchema = z.object({
   ignoreFailedImages: z.boolean().default(false),
 })
 
+export const MarlinMaterialDeleteQuerySchema = z.object({
+  detach: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((value) => value === 'true'),
+})
+
 export class MarlinMaterialImportDto extends createZodDto(
   MarlinMaterialImportSchema,
 ) {}
@@ -59,4 +66,7 @@ export class MarlinMaterialUrlImportDto extends createZodDto(
 ) {}
 export class MarlinMaterialAnalyzeDto extends createZodDto(
   MarlinMaterialAnalyzeSchema,
+) {}
+export class MarlinMaterialDeleteQueryDto extends createZodDto(
+  MarlinMaterialDeleteQuerySchema,
 ) {}

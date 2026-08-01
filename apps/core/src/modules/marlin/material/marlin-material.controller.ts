@@ -1,5 +1,6 @@
 import {
   Body,
+  Delete,
   Get,
   HttpCode,
   NotFoundException,
@@ -17,6 +18,7 @@ import { EntityIdDto } from '~/shared/dto/id.dto'
 import { MarlinMaterialRepository } from './marlin-material.repository'
 import {
   MarlinMaterialAnalyzeDto,
+  MarlinMaterialDeleteQueryDto,
   MarlinMaterialImportDto,
   MarlinMaterialListDto,
   MarlinMaterialUrlImportDto,
@@ -60,6 +62,15 @@ export class MarlinMaterialController {
     const material = await this.repository.findById(id)
     if (!material) throw new NotFoundException('Material not found')
     return material
+  }
+
+  @Delete('/:id')
+  @HttpCode(200)
+  delete(
+    @Param() { id }: EntityIdDto,
+    @Query() query: MarlinMaterialDeleteQueryDto,
+  ) {
+    return this.service.delete(id, query.detach)
   }
 
   @Post('/:id/analyze')

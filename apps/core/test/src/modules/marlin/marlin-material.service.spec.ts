@@ -7,6 +7,46 @@ import { MarlinMaterialService } from '~/modules/marlin/material/marlin-material
 import type { MarlinOpenListService } from '~/modules/marlin/material/marlin-openlist.service'
 
 describe('MarlinMaterialService', () => {
+  it('requires explicit detachment before deleting referenced material', async () => {
+    const repository = {
+      delete: vi.fn().mockResolvedValue({
+        material: { id: 'material-1' },
+        deleted: false,
+        detached: 0,
+        attachedProjects: 2,
+      }),
+    }
+    const service = new MarlinMaterialService(
+      repository as unknown as MarlinMaterialRepository,
+      {} as MarlinOpenListService,
+    )
+
+    await expect(service.delete('material-1', false)).rejects.toThrow(
+      'attached to 2 project(s)',
+    )
+  })
+
+  it('reports how many project links were detached during deletion', async () => {
+    const repository = {
+      delete: vi.fn().mockResolvedValue({
+        material: { id: 'material-1' },
+        deleted: true,
+        detached: 2,
+        attachedProjects: 2,
+      }),
+    }
+    const service = new MarlinMaterialService(
+      repository as unknown as MarlinMaterialRepository,
+      {} as MarlinOpenListService,
+    )
+
+    await expect(service.delete('material-1', true)).resolves.toEqual({
+      id: 'material-1',
+      deleted: true,
+      detached: 2,
+    })
+  })
+
   it('freezes exact UTF-8 content with a stable SHA-256 hash and evidence', async () => {
     const repository = {
       importFrozen: vi.fn().mockResolvedValue({ deduplicated: false }),

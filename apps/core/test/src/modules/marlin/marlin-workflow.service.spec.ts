@@ -14,6 +14,7 @@ const createService = () => {
     createPublication: vi.fn(),
     approveCurrentRevision: vi.fn(),
     decideReview: vi.fn(),
+    deleteProject: vi.fn(),
     findProject: vi.fn(),
     findPublishedRevision: vi.fn(),
     findReview: vi.fn(),
@@ -41,6 +42,36 @@ const createService = () => {
 }
 
 describe('MarlinWorkflowService', () => {
+  it('deletes a local draft and its workflow records', async () => {
+    const { repository, service } = createService()
+    repository.findProject.mockResolvedValue({
+      id: 'project-1',
+      status: 'draft',
+      corePostId: null,
+    })
+    repository.deleteProject.mockResolvedValue({ id: 'project-1' })
+
+    await expect(service.deleteProject('project-1')).resolves.toEqual({
+      id: 'project-1',
+      deleted: true,
+    })
+    expect(repository.deleteProject).toHaveBeenCalledWith('project-1')
+  })
+
+  it('requires withdrawing a published Core post before local deletion', async () => {
+    const { repository, service } = createService()
+    repository.findProject.mockResolvedValue({
+      id: 'project-1',
+      status: 'published',
+      corePostId: 'post-1',
+    })
+
+    await expect(service.deleteProject('project-1')).rejects.toThrow(
+      'Withdraw the published Core post',
+    )
+    expect(repository.deleteProject).not.toHaveBeenCalled()
+  })
+
   it('blocks pending materials from entering a creation project', async () => {
     const { repository, service } = createService()
     repository.attachMaterials.mockResolvedValue({

@@ -47,6 +47,19 @@ export class MarlinWorkflowService {
     return project
   }
 
+  async deleteProject(id: string) {
+    const project = await this.repository.findProject(id)
+    if (!project) throw new NotFoundException('MARLIN project not found')
+    if (project.corePostId && project.status !== 'withdrawn') {
+      throw new ConflictException(
+        'Withdraw the published Core post before deleting this project',
+      )
+    }
+    const deleted = await this.repository.deleteProject(id)
+    if (!deleted) throw new NotFoundException('MARLIN project not found')
+    return { id: deleted.id, deleted: true }
+  }
+
   async attachMaterials(projectId: string, materialIds: string[]) {
     const result = await this.repository.attachMaterials(projectId, materialIds)
     if (!result) throw new NotFoundException('MARLIN project not found')
