@@ -171,7 +171,7 @@ export class MarlinAiService {
       defaultProviderId: defaultProvider?.id,
       defaultModel: defaultProvider?.defaultModel,
       providers: (safeConfig.providers || []).map((provider) => ({
-        ...provider,
+        ...resolveAIProviderAdapter(provider),
         credentialConfigured: Boolean(
           aiConfig.providers?.find(({ id }) => id === provider.id)?.apiKey,
         ),
