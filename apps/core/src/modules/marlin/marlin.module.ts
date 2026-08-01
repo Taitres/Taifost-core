@@ -4,6 +4,7 @@ import { AiModule } from '../ai/ai.module'
 import { MarlinAiController } from './ai/marlin-ai.controller'
 import { MarlinAiRepository } from './ai/marlin-ai.repository'
 import { MarlinAiService } from './ai/marlin-ai.service'
+import { MarlinWritingPipelineService } from './ai/marlin-writing-pipeline.service'
 import { MarlinComposeController } from './compose/marlin-compose.controller'
 import { MarlinComposeService } from './compose/marlin-compose.service'
 import { MarlinHotspotController } from './hotspot/marlin-hotspot.controller'
@@ -48,6 +49,7 @@ import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
     MarlinHotspotScheduler,
     MarlinAiRepository,
     MarlinAiService,
+    MarlinWritingPipelineService,
     MarlinOpsService,
   ],
   exports: [
@@ -59,6 +61,7 @@ import { MarlinWorkflowService } from './workflow/marlin-workflow.service'
     MarlinHotspotService,
     MarlinAiRepository,
     MarlinAiService,
+    MarlinWritingPipelineService,
   ],
 })
 export class MarlinModule {}

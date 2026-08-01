@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { AppErrorCode, createAppException } from '~/common/errors'
-import type { AiService } from '~/modules/ai/ai.service'
 import type { CategoryService } from '~/modules/category/category.service'
+import type { MarlinWritingPipelineService } from '~/modules/marlin/ai/marlin-writing-pipeline.service'
 import { MarlinComposeService } from '~/modules/marlin/compose/marlin-compose.service'
 import type { MarlinMaterialService } from '~/modules/marlin/material/marlin-material.service'
 import type { MarlinWorkflowService } from '~/modules/marlin/workflow/marlin-workflow.service'
@@ -24,9 +23,9 @@ const createService = () => {
       { id: 'category-2', name: '技术', slug: 'tech' },
     ]),
   }
-  const runtime = {
-    providerInfo: { id: 'writer', type: 'openai-compatible', model: 'model-1' },
-    generateStructured: vi.fn().mockResolvedValue({
+  const pipeline = {
+    assertReady: vi.fn().mockResolvedValue(undefined),
+    run: vi.fn().mockResolvedValue({
       output: {
         title: '自动生成的文章',
         slug: 'generated-article',
@@ -35,17 +34,18 @@ const createService = () => {
         tags: ['AI', '写作'],
         category: '技术',
       },
-      usage: { totalTokens: 120 },
+      stages: [{ key: 'writing', label: '撰写成稿', totalTokens: 120 }],
+      review: { verdict: 'pass', issues: [], notes: [], remainingRisks: [] },
+      usage: { totalTokens: 120, models: ['provider/model-1'] },
     }),
   }
-  const ai = { getWriterModel: vi.fn().mockResolvedValue(runtime) }
   const service = new MarlinComposeService(
     materials as unknown as MarlinMaterialService,
     workflow as unknown as MarlinWorkflowService,
     categories as unknown as CategoryService,
-    ai as unknown as AiService,
+    pipeline as unknown as MarlinWritingPipelineService,
   )
-  return { ai, categories, materials, runtime, service, workflow }
+  return { categories, materials, pipeline, service, workflow }
 }
 
 describe('MarlinComposeService', () => {
@@ -124,47 +124,18 @@ describe('MarlinComposeService', () => {
     expect(result.ignoredImages).toBe(1)
   })
 
-  it('still delivers an editable draft when no AI provider is configured', async () => {
-    const { ai, materials, service, workflow } = createService()
-    ai.getWriterModel.mockRejectedValue(
-      createAppException(AppErrorCode.AI_NOT_ENABLED),
-    )
-    materials.import.mockResolvedValue({
-      material: { id: 'material-3', title: '极简创作说明' },
-      deduplicated: false,
-    })
-    materials.analyze.mockResolvedValue({
-      material: {
-        id: 'material-3',
-        title: '极简创作说明',
-        content: '只粘贴来源，系统自动创建可编辑草稿。',
-      },
-      analysis: {
-        summary: '只粘贴来源，系统自动创建可编辑草稿。',
-        tags: ['创作', '草稿'],
-        media: [],
-      },
-    })
+  it('requires a configured AI pipeline before importing the source', async () => {
+    const { materials, pipeline, service } = createService()
+    pipeline.assertReady.mockRejectedValue(new Error('AI is not configured'))
 
-    const result = await service.compose({
-      source: '只粘贴来源，系统自动创建可编辑草稿。',
-      instruction: '',
-    })
-
-    expect(result.generationMode).toBe('local')
-    expect(workflow.createRevision).toHaveBeenCalledWith(
-      'project-1',
-      expect.objectContaining({
-        title: '极简创作说明',
-        content: expect.stringContaining('# 极简创作说明'),
-        tags: ['创作', '草稿'],
-      }),
-    )
+    await expect(
+      service.compose({ source: '来源正文', instruction: '' }),
+    ).rejects.toThrow('AI is not configured')
+    expect(materials.import).not.toHaveBeenCalled()
   })
 
-  it('does not hide failures from a configured AI provider', async () => {
-    const { ai, materials, service } = createService()
-    ai.getWriterModel.mockRejectedValue(new Error('provider unavailable'))
+  it('persists the real pipeline report with the editable revision', async () => {
+    const { materials, service, workflow } = createService()
     materials.import.mockResolvedValue({
       material: { id: 'material-4', title: '来源' },
       deduplicated: false,
@@ -174,8 +145,21 @@ describe('MarlinComposeService', () => {
       analysis: { media: [] },
     })
 
-    await expect(
-      service.compose({ source: '来源正文', instruction: '' }),
-    ).rejects.toThrow('provider unavailable')
+    const result = await service.compose({
+      source: '来源正文',
+      instruction: '',
+    })
+
+    expect(result.pipeline).toEqual([
+      expect.objectContaining({ key: 'writing', totalTokens: 120 }),
+    ])
+    expect(workflow.createRevision).toHaveBeenCalledWith(
+      'project-1',
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          generation: expect.objectContaining({ mode: 'ai-pipeline' }),
+        }),
+      }),
+    )
   })
 })

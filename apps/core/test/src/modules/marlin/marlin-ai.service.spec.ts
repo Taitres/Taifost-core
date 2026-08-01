@@ -1,8 +1,17 @@
 import { BadRequestException } from '@nestjs/common'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { MarlinAiAdviceSchema } from '~/modules/marlin/ai/marlin-ai.schema'
-import { parseMarlinAiAdvice } from '~/modules/marlin/ai/marlin-ai.service'
+import type { ConfigsService } from '~/modules/configs/configs.service'
+import type { MarlinAiRepository } from '~/modules/marlin/ai/marlin-ai.repository'
+import {
+  MarlinAiAdviceSchema,
+  MarlinUnifiedAiConfigSchema,
+} from '~/modules/marlin/ai/marlin-ai.schema'
+import {
+  MarlinAiService,
+  parseMarlinAiAdvice,
+} from '~/modules/marlin/ai/marlin-ai.service'
+import type { MarlinWorkflowRepository } from '~/modules/marlin/workflow/marlin-workflow.repository'
 
 describe('parseMarlinAiAdvice', () => {
   it('accepts the fixed quick-rewriter workflow slot', () => {
@@ -36,5 +45,77 @@ describe('parseMarlinAiAdvice', () => {
     expect(() => parseMarlinAiAdvice('我建议直接发布。')).toThrow(
       BadRequestException,
     )
+  })
+
+  it('synchronizes one default model across Core features and all MARLIN roles', async () => {
+    let aiConfig: Record<string, any> = { providers: [] }
+    const repository = {
+      listRoles: vi.fn().mockResolvedValue([]),
+      upsertRole: vi.fn().mockImplementation(async (role) => ({
+        id: `role-${role.slot}`,
+        ...role,
+      })),
+    }
+    const configs = {
+      get: vi.fn().mockImplementation(async () => aiConfig),
+      getForResponse: vi.fn().mockImplementation(async () => ({
+        ...aiConfig,
+        providers: (aiConfig.providers || []).map((provider: any) => ({
+          ...provider,
+          apiKey: '',
+        })),
+      })),
+      patchAndValid: vi.fn().mockImplementation(async (_key, patch) => {
+        aiConfig = { ...aiConfig, ...patch }
+        return aiConfig
+      }),
+    }
+    const service = new MarlinAiService(
+      repository as unknown as MarlinAiRepository,
+      {} as MarlinWorkflowRepository,
+      configs as unknown as ConfigsService,
+    )
+    const input = MarlinUnifiedAiConfigSchema.parse({
+      providers: [
+        {
+          id: 'main',
+          name: '主模型',
+          type: 'openai-compatible',
+          apiKey: 'secret',
+          endpoint: 'https://example.com/v1',
+          defaultModel: 'model-1',
+          enabled: true,
+        },
+      ],
+      defaultProviderId: 'main',
+      defaultModel: 'model-1',
+      assignments: {
+        review: { providerId: 'main', model: 'model-review' },
+      },
+    })
+
+    const result = await service.saveUnifiedConfig(input)
+
+    expect(configs.patchAndValid).toHaveBeenCalledWith(
+      'ai',
+      expect.objectContaining({
+        writerModel: { providerId: 'main', model: 'model-1' },
+        summaryModel: { providerId: 'main', model: 'model-1' },
+        translationModel: { providerId: 'main', model: 'model-1' },
+      }),
+    )
+    expect(repository.upsertRole).toHaveBeenCalledTimes(7)
+    expect(repository.upsertRole).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slot: 'reviewer',
+        providerId: 'main',
+        model: 'model-review',
+      }),
+    )
+    expect(result).toMatchObject({
+      ready: true,
+      defaultProviderId: 'main',
+      defaultModel: 'model-1',
+    })
   })
 })
