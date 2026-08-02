@@ -323,6 +323,45 @@ describe('PiRuntimeAdapter', () => {
       })
       expect(result.output).toEqual({ title: 'done', score: 9 })
     })
+
+    it('feeds schema validation errors back to the model and accepts a corrected tool call', async () => {
+      const adapter = adapterWithResponses([
+        fauxAssistantMessage([
+          fauxToolCall('structured_output', {
+            title: 'invalid',
+            score: 1,
+            extra: true,
+          }),
+        ]),
+        fauxAssistantMessage([
+          fauxToolCall('structured_output', { title: 'corrected', score: 2 }),
+        ]),
+      ])
+
+      const result = await adapter.generateStructured({
+        prompt: 'go',
+        schema,
+        maxRetries: 1,
+      })
+
+      expect(result.output).toEqual({ title: 'corrected', score: 2 })
+    })
+
+    it('does not retry schema validation when maxRetries is zero', async () => {
+      const adapter = adapterWithResponses([
+        fauxAssistantMessage([
+          fauxToolCall('structured_output', {
+            title: 'invalid',
+            score: 1,
+            extra: true,
+          }),
+        ]),
+      ])
+
+      await expect(
+        adapter.generateStructured({ prompt: 'go', schema, maxRetries: 0 }),
+      ).rejects.toThrow(/additional properties/i)
+    })
   })
 
   describe('generateTextStream', () => {

@@ -423,6 +423,8 @@ export class PiRuntimeAdapter implements IModelRuntime {
       totalTokens: 0,
       cost: { total: 0 },
     }
+    const validationRetryLimit = typed.maxRetries ?? 2
+    let validationRetries = 0
 
     for (let i = 0; i < STRUCTURED_MAX_ITERATIONS; i++) {
       if (typed.signal?.aborted) {
@@ -464,24 +466,49 @@ export class PiRuntimeAdapter implements IModelRuntime {
         continue
       }
 
-      let args: unknown = toolCall.arguments
-      if (typeof args === 'string') {
-        args = JSON.parse(args)
-      }
-      if (!isObjectRecord(args)) {
-        throw new Error(
-          'pi tool call arguments are neither an object nor JSON-parseable string',
-        )
-      }
+      let output: unknown
+      try {
+        let args: unknown = toolCall.arguments
+        if (typeof args === 'string') {
+          args = JSON.parse(args)
+        }
+        if (!isObjectRecord(args)) {
+          throw new Error(
+            'pi tool call arguments are neither an object nor JSON-parseable string',
+          )
+        }
 
-      let output: unknown = args
-      if (typed.validate !== false) {
-        output = validateToolCall(tools, {
-          type: 'toolCall',
-          id: toolCall.id,
-          name: toolCall.name,
-          arguments: args as Record<string, unknown>,
+        output = args
+        if (typed.validate !== false) {
+          output = validateToolCall(tools, {
+            type: 'toolCall',
+            id: toolCall.id,
+            name: toolCall.name,
+            arguments: args as Record<string, unknown>,
+          })
+        }
+      } catch (error) {
+        if (validationRetries >= validationRetryLimit) throw error
+        validationRetries += 1
+        conversation.messages.push(message)
+        conversation.messages.push({
+          role: 'toolResult',
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          content: [
+            {
+              type: 'text',
+              text: [
+                'The structured output failed schema validation.',
+                error instanceof Error ? error.message : String(error),
+                'Call the tool again with corrected arguments that match the schema exactly. Do not add undeclared properties.',
+              ].join('\n'),
+            },
+          ],
+          isError: true,
+          timestamp: Date.now(),
         })
+        continue
       }
 
       return {
