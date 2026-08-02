@@ -18,6 +18,7 @@ const createService = () => {
     findProject: vi.fn(),
     findPublishedRevision: vi.fn(),
     findReview: vi.fn(),
+    linkCoreDraft: vi.fn(),
     updateReviewEmailDelivery: vi.fn(),
   }
   const categoryService = { findCategoryById: vi.fn() }
@@ -42,6 +43,47 @@ const createService = () => {
 }
 
 describe('MarlinWorkflowService', () => {
+  it('creates an unpublished Core post as the single editable draft', async () => {
+    const { postService, repository, service } = createService()
+    repository.findPublishedRevision.mockResolvedValue({
+      project: { id: 'project-1', corePostId: null },
+      revision: {
+        id: 'revision-1',
+        version: 1,
+        title: 'AI 草稿',
+        slug: 'ai-draft',
+        summary: '摘要',
+        content: '# AI 草稿',
+        categoryId: 'category-1',
+        tags: ['AI'],
+        copyright: true,
+        metadata: {},
+      },
+    })
+    postService.create.mockResolvedValue({ id: 'post-1' })
+    repository.linkCoreDraft.mockResolvedValue({
+      id: 'project-1',
+      corePostId: 'post-1',
+      status: 'in_review',
+    })
+
+    await expect(
+      service.createCoreDraft('project-1', 'revision-1'),
+    ).resolves.toEqual({ id: 'post-1' })
+    expect(postService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'AI 草稿',
+        isPublished: false,
+        text: '# AI 草稿',
+        meta: expect.objectContaining({
+          marlinProjectId: 'project-1',
+          marlinWorkflowStatus: 'awaiting-review',
+        }),
+      }),
+    )
+    expect(repository.linkCoreDraft).toHaveBeenCalledWith('project-1', 'post-1')
+  })
+
   it('deletes a local draft and its workflow records', async () => {
     const { repository, service } = createService()
     repository.findProject.mockResolvedValue({

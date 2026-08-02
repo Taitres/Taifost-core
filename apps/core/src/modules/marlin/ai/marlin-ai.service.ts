@@ -24,6 +24,7 @@ import {
 } from './marlin-ai.schema'
 
 const taskToRole = {
+  materialGrouping: 'material-recognizer',
   materialAnalysis: 'material-analyst',
   topicPlanning: 'topic-planner',
   writing: 'writer',
@@ -53,6 +54,12 @@ const defaultRoleSettings: Record<
   (typeof marlinAiSlots)[number],
   { systemPrompt: string; temperature: number; maxTokens: number }
 > = {
+  'material-recognizer': {
+    systemPrompt:
+      '你是素材识别员。判断哪些冻结素材围绕同一主题、证据互补且适合合写一篇文章；只返回给定素材 ID，不得虚构来源。',
+    temperature: 0.15,
+    maxTokens: 4096,
+  },
   'material-analyst': {
     systemPrompt:
       '你是严谨的中文资料分析员。只提取来源中存在的事实、观点、引用和不确定性，禁止补造信息。',

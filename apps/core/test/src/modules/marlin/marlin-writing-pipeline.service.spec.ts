@@ -5,6 +5,69 @@ import type { MarlinAiService } from '~/modules/marlin/ai/marlin-ai.service'
 import { MarlinWritingPipelineService } from '~/modules/marlin/ai/marlin-writing-pipeline.service'
 
 describe('MarlinWritingPipelineService', () => {
+  it('uses the material recognizer and rejects material IDs outside the inbox', async () => {
+    const generateStructured = vi.fn().mockResolvedValue({
+      output: {
+        groups: [
+          {
+            materialIds: ['material-new', 'material-related', 'invented-id'],
+            title: '同一主题',
+            instruction: '合并两份互补资料',
+            reason: '主题一致且证据互补',
+            confidence: 0.92,
+          },
+        ],
+      },
+      usage: { totalTokens: 12 },
+    })
+    const ai = {
+      resolveRoleRuntime: vi.fn().mockResolvedValue({
+        runtime: { generateStructured },
+        role: { id: 'recognizer-role', dailyBudgetCents: 0 },
+        provider: { id: 'deepseek' },
+        model: 'deepseek-chat',
+        settings: {
+          systemPrompt: 'recognize',
+          temperature: 0.1,
+          maxTokens: 512,
+        },
+      }),
+    }
+    const repository = {
+      usageToday: vi.fn().mockResolvedValue({ costCents: 0 }),
+      recordUsage: vi.fn().mockResolvedValue({}),
+    }
+    const service = new MarlinWritingPipelineService(
+      ai as unknown as MarlinAiService,
+      repository as unknown as MarlinAiRepository,
+    )
+
+    const result = await service.recognizeMaterialGroups({
+      focusMaterialId: 'material-new',
+      materials: [
+        {
+          id: 'material-new',
+          title: '新资料',
+          content: '内容',
+          analysis: null,
+        },
+        {
+          id: 'material-related',
+          title: '补充资料',
+          content: '补充',
+          analysis: null,
+        },
+      ],
+    })
+
+    expect(ai.resolveRoleRuntime).toHaveBeenCalledWith('material-recognizer')
+    expect(result.group.materialIds).toEqual([
+      'material-new',
+      'material-related',
+    ])
+    expect(result.stage.key).toBe('materialGrouping')
+  })
+
   it('runs analysis through SEO in order and returns only the reviewed content', async () => {
     const outputs = [
       {

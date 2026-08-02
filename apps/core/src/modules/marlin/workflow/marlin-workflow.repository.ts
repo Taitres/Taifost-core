@@ -51,6 +51,19 @@ export class MarlinWorkflowRepository extends BaseRepository {
     return row ?? null
   }
 
+  async linkCoreDraft(projectIdInput: string, corePostId: string) {
+    const [project] = await this.db
+      .update(marlinProjects)
+      .set({
+        corePostId,
+        status: 'in_review',
+        updatedAt: new Date(),
+      })
+      .where(eq(marlinProjects.id, this.toDbId(projectIdInput)))
+      .returning()
+    return project ?? null
+  }
+
   async deleteProject(id: string) {
     const projectId = this.toDbId(id)
     return this.db.transaction(async (tx) => {

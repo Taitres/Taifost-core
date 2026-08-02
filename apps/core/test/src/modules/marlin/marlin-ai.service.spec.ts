@@ -143,7 +143,14 @@ describe('parseMarlinAiAdvice', () => {
         translationModel: { providerId: 'main', model: 'model-1' },
       }),
     )
-    expect(repository.upsertRole).toHaveBeenCalledTimes(7)
+    expect(repository.upsertRole).toHaveBeenCalledTimes(8)
+    expect(repository.upsertRole).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slot: 'material-recognizer',
+        providerId: 'main',
+        model: 'model-1',
+      }),
+    )
     expect(repository.upsertRole).toHaveBeenCalledWith(
       expect.objectContaining({
         slot: 'reviewer',

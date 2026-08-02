@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { and, desc, eq, ilike, type SQL, sql } from 'drizzle-orm'
+import { and, desc, eq, ilike, isNull, type SQL, sql } from 'drizzle-orm'
 
 import { PG_DB_TOKEN } from '~/constants/system.constant'
 import {
@@ -128,6 +128,25 @@ export class MarlinMaterialRepository extends BaseRepository {
       .orderBy(desc(marlinMaterialImports.createdAt))
 
     return { ...material, imports }
+  }
+
+  async listUnassignedAnalyzed(limit = 12) {
+    return this.db
+      .select({ material: marlinMaterials })
+      .from(marlinMaterials)
+      .leftJoin(
+        marlinProjectMaterials,
+        eq(marlinProjectMaterials.materialId, marlinMaterials.id),
+      )
+      .where(
+        and(
+          eq(marlinMaterials.status, 'analyzed'),
+          isNull(marlinProjectMaterials.projectId),
+        ),
+      )
+      .orderBy(desc(marlinMaterials.createdAt))
+      .limit(limit)
+      .then((rows) => rows.map(({ material }) => material))
   }
 
   async delete(id: string, detach: boolean) {

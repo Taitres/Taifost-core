@@ -154,6 +154,10 @@ export class MarlinMaterialService {
     return { id: result.material.id, deleted: true, detached: result.detached }
   }
 
+  listUnassignedAnalyzed(limit = 12) {
+    return this.repository.listUnassignedAnalyzed(limit)
+  }
+
   async importUrl(input: {
     url: string
     title?: string

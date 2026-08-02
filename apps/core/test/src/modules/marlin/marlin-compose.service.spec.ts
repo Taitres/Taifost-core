@@ -11,11 +11,17 @@ const createService = () => {
     import: vi.fn(),
     importUrl: vi.fn(),
     analyze: vi.fn(),
+    listUnassignedAnalyzed: vi.fn().mockResolvedValue([]),
   }
   const workflow = {
     createProject: vi.fn().mockResolvedValue({ id: 'project-1' }),
     attachMaterials: vi.fn().mockResolvedValue({ attached: [] }),
     createRevision: vi.fn().mockResolvedValue({ id: 'revision-1' }),
+    createCoreDraft: vi.fn().mockResolvedValue({ id: 'post-1' }),
+    requestReview: vi.fn().mockResolvedValue({
+      request: { id: 'review-1' },
+      emailDelivery: { status: 'not_requested' },
+    }),
   }
   const categories = {
     findAllCategory: vi.fn().mockResolvedValue([
@@ -25,6 +31,16 @@ const createService = () => {
   }
   const pipeline = {
     assertReady: vi.fn().mockResolvedValue(undefined),
+    recognizeMaterialGroups: vi.fn().mockImplementation(async (input) => ({
+      group: {
+        materialIds: [input.focusMaterialId],
+        title: '识别后的主题',
+        instruction: '整理成文',
+        reason: '单素材足够完整',
+        confidence: 1,
+      },
+      stage: { key: 'materialGrouping', label: '识别可合写素材' },
+    })),
     run: vi.fn().mockResolvedValue({
       output: {
         title: '自动生成的文章',
@@ -94,9 +110,20 @@ describe('MarlinComposeService', () => {
         content: expect.stringContaining('完整正文'),
       }),
     )
+    expect(workflow.createCoreDraft).toHaveBeenCalledWith(
+      'project-1',
+      'revision-1',
+    )
+    expect(workflow.requestReview).toHaveBeenCalledWith('project-1', {
+      revisionId: 'revision-1',
+      expiresInHours: 168,
+      reviewerEmail: undefined,
+    })
     expect(result).toMatchObject({
       project: { id: 'project-1' },
       revision: { id: 'revision-1' },
+      coreDraft: { id: 'post-1' },
+      reviewRequest: { request: { id: 'review-1' } },
     })
   })
 

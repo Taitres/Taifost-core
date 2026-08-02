@@ -87,6 +87,27 @@ export class MarlinComposeService {
       throw new BadRequestException('Imported material could not be analyzed')
     }
 
+    const candidateMaterials = await this.materials.listUnassignedAnalyzed(12)
+    const candidates = candidateMaterials.some(
+      ({ id }) => String(id) === materialId,
+    )
+      ? candidateMaterials
+      : [analyzed.material, ...candidateMaterials].slice(0, 12)
+    const recognition = await this.pipeline.recognizeMaterialGroups({
+      focusMaterialId: materialId,
+      materials: candidates.map((material) => ({
+        id: String(material.id),
+        title: material.title,
+        content: material.content,
+        analysis: material.analysis as Record<string, unknown> | null,
+      })),
+    })
+    const selectedMaterials = recognition.group.materialIds
+      .map((id) => candidates.find((material) => String(material.id) === id))
+      .filter((material): material is (typeof candidates)[number] =>
+        Boolean(material),
+      )
+
     const categories = await this.categories.findAllCategory()
     const defaultCategory = categories[0]
     if (!defaultCategory) {
@@ -98,13 +119,20 @@ export class MarlinComposeService {
       .join('、')
     const instruction =
       input.instruction ||
+      recognition.group.instruction ||
       '整理为结构清晰、可直接编辑发布的中文文章。保留有用事实与引用，不编造来源。'
-    const sourceContent = analyzed.material.content.slice(0, 80_000)
+    const sourceContent = selectedMaterials
+      .map(
+        (material, index) =>
+          `## 素材 ${index + 1}：${material.title}\n\n${material.content}`,
+      )
+      .join('\n\n---\n\n')
+      .slice(0, 80_000)
     const analysis = analyzed.analysis as {
       media?: Array<{ status: string }>
     }
     const pipelineResult = await this.pipeline.run({
-      sourceTitle: analyzed.material.title,
+      sourceTitle: recognition.group.title || analyzed.material.title,
       sourceContent,
       instruction,
       categoryChoices,
@@ -114,6 +142,10 @@ export class MarlinComposeService {
       mode: 'ai-pipeline',
       ...pipelineResult.usage,
       stages: pipelineResult.stages,
+      recognition: {
+        ...recognition.group,
+        stage: recognition.stage,
+      },
       review: pipelineResult.review,
     }
 
@@ -128,7 +160,10 @@ export class MarlinComposeService {
       title: output.title,
       goal: instruction,
     })
-    await this.workflow.attachMaterials(String(project.id), [materialId])
+    await this.workflow.attachMaterials(
+      String(project.id),
+      selectedMaterials.map(({ id }) => String(id)),
+    )
     const revision = await this.workflow.createRevision(String(project.id), {
       title: output.title,
       slug: normalizedSlug(output.slug, String(project.id)),
@@ -139,15 +174,34 @@ export class MarlinComposeService {
       copyright: true,
       metadata: {
         editor: 'marlin-compose',
-        sourceMaterialId: materialId,
+        sourceMaterialIds: selectedMaterials.map(({ id }) => String(id)),
+        materialRecognition: recognition.group,
         generation,
       },
     })
+    const coreDraft = await this.workflow.createCoreDraft(
+      String(project.id),
+      String(revision.id),
+    )
+    const reviewRequest = await this.workflow.requestReview(
+      String(project.id),
+      {
+        revisionId: String(revision.id),
+        expiresInHours: 168,
+        reviewerEmail: input.reviewerEmail,
+      },
+    )
 
     return {
       material: analyzed.material,
       project,
       revision,
+      coreDraft: {
+        id: coreDraft.id,
+        editorHash: `#/posts/edit?id=${coreDraft.id}`,
+      },
+      reviewRequest,
+      recognition: recognition.group,
       deduplicated: imported.deduplicated,
       generationMode: 'ai' as const,
       pipeline: pipelineResult.stages,

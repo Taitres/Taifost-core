@@ -84,6 +84,43 @@ export class MarlinWorkflowService {
     return revision
   }
 
+  async createCoreDraft(projectId: string, revisionId: string) {
+    const result = await this.repository.findPublishedRevision(
+      projectId,
+      revisionId,
+    )
+    if (!result) throw new NotFoundException('Project revision not found')
+    const { project, revision } = result
+    const postInput = {
+      title: revision.title,
+      slug: revision.slug,
+      summary: revision.summary,
+      text: revision.content,
+      content: null,
+      contentFormat: ContentFormat.Markdown,
+      categoryId: revision.categoryId,
+      tags: revision.tags,
+      copyright: revision.copyright,
+      isPublished: false,
+      isPremium: false,
+      images: [],
+      meta: {
+        ...revision.metadata,
+        marlinProjectId: project.id,
+        marlinRevisionId: revision.id,
+        marlinRevisionVersion: revision.version,
+        marlinWorkflowStatus: 'awaiting-review',
+      },
+    }
+    const post = project.corePostId
+      ? await this.postService.updateById(project.corePostId, postInput as any)
+      : await this.postService.create(postInput as any)
+    if (!post) throw new Error('Core draft creation failed')
+    const linked = await this.repository.linkCoreDraft(projectId, post.id)
+    if (!linked) throw new NotFoundException('MARLIN project not found')
+    return post
+  }
+
   private hashPasscode(passcode: string) {
     const salt = randomBytes(16).toString('hex')
     const hash = scryptSync(passcode, salt, 32).toString('hex')

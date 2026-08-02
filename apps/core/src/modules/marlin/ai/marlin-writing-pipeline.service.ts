@@ -20,6 +20,28 @@ const AnalysisSchema = Type.Object(
   { additionalProperties: false },
 )
 
+const MaterialGroupsSchema = Type.Object(
+  {
+    groups: Type.Array(
+      Type.Object(
+        {
+          materialIds: Type.Array(Type.String({ minLength: 1 }), {
+            minItems: 1,
+            maxItems: 12,
+          }),
+          title: Type.String({ minLength: 1, maxLength: 300 }),
+          instruction: Type.String({ minLength: 1, maxLength: 2_000 }),
+          reason: Type.String({ minLength: 1, maxLength: 2_000 }),
+          confidence: Type.Number({ minimum: 0, maximum: 1 }),
+        },
+        { additionalProperties: false },
+      ),
+      { maxItems: 12 },
+    ),
+  },
+  { additionalProperties: false },
+)
+
 const PlanSchema = Type.Object(
   {
     audience: Type.String({ minLength: 1, maxLength: 1_000 }),
@@ -124,7 +146,70 @@ export class MarlinWritingPipelineService {
   ) {}
 
   async assertReady() {
-    await this.ai.resolveRoleRuntime('material-analyst')
+    await Promise.all([
+      this.ai.resolveRoleRuntime('material-recognizer'),
+      this.ai.resolveRoleRuntime('material-analyst'),
+    ])
+  }
+
+  async recognizeMaterialGroups(input: {
+    focusMaterialId: string
+    materials: Array<{
+      id: string
+      title: string
+      content: string
+      analysis: Record<string, unknown> | null
+    }>
+  }) {
+    const knownIds = new Set(input.materials.map(({ id }) => id))
+    const result = await this.runStage<{
+      groups: Array<{
+        materialIds: string[]
+        title: string
+        instruction: string
+        reason: string
+        confidence: number
+      }>
+    }>({
+      slot: 'material-recognizer',
+      key: 'materialGrouping',
+      label: '识别可合写素材',
+      operation: 'pipeline-material-grouping',
+      schema: MaterialGroupsSchema,
+      maxTokens: 4096,
+      prompt: [
+        `本次新素材 ID：${input.focusMaterialId}`,
+        `待识别素材：${JSON.stringify(
+          input.materials.map(({ id, title, content, analysis }) => ({
+            id,
+            title,
+            analysis,
+            excerpt: content.slice(0, 4_000),
+          })),
+        )}`,
+        '把主题一致、证据互补且可合写的素材放入同一组。必须让本次新素材出现在且只出现在一个组中；若没有可合并素材，就为它返回单素材组。不要返回列表中不存在的 ID。',
+      ].join('\n\n'),
+    })
+    const groups = result.output.groups
+      .map((group) => ({
+        ...group,
+        materialIds: [...new Set(group.materialIds)].filter((id) =>
+          knownIds.has(id),
+        ),
+      }))
+      .filter(({ materialIds }) => materialIds.length > 0)
+    const selected = groups.find(({ materialIds }) =>
+      materialIds.includes(input.focusMaterialId),
+    ) ?? {
+      materialIds: [input.focusMaterialId],
+      title:
+        input.materials.find(({ id }) => id === input.focusMaterialId)?.title ||
+        '新文章',
+      instruction: '把这份素材整理为结构清晰、证据边界明确的文章。',
+      reason: '没有识别到可靠的合并对象，按单素材进入流水线。',
+      confidence: 1,
+    }
+    return { group: selected, stage: result.stage }
   }
 
   private async runStage<T>(input: {

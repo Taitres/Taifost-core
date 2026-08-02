@@ -5,6 +5,7 @@ import { AIProviderType } from '~/modules/ai/ai.types'
 import { camelcaseKeys } from '~/utils/tool.util'
 
 export const marlinAiSlots = [
+  'material-recognizer',
   'material-analyst',
   'topic-planner',
   'writer',
@@ -38,6 +39,7 @@ export const MarlinAiAdviceOutputSchema = z.object({
 })
 
 export const marlinAiTaskKeys = [
+  'materialGrouping',
   'materialAnalysis',
   'topicPlanning',
   'writing',
