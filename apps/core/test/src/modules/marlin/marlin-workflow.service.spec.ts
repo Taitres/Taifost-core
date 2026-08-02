@@ -193,6 +193,7 @@ describe('MarlinWorkflowService', () => {
   })
 
   it('emails the external reviewer and records delivery status', async () => {
+    vi.stubEnv('MARLIN_REVIEW_PASSCODE', '')
     const { configsService, emailService, repository, service } =
       createService()
     repository.findProject.mockResolvedValue({
@@ -237,8 +238,8 @@ describe('MarlinWorkflowService', () => {
         ),
       }),
     )
-    expect(emailService.send.mock.calls[0][0].text).not.toContain(
-      result.passcode,
+    expect(emailService.send.mock.calls[0][0].text).toContain(
+      `https://example.com/studio/review/review-1?passcode=${result.passcode}`,
     )
     expect(repository.updateReviewEmailDelivery).toHaveBeenCalledWith(
       'review-1',
@@ -248,6 +249,7 @@ describe('MarlinWorkflowService', () => {
       status: 'sent',
       to: 'reviewer@example.com',
     })
+    vi.unstubAllEnvs()
   })
 
   it('refuses to publish a revision different from the approved snapshot', async () => {

@@ -191,7 +191,10 @@ export class MarlinWorkflowService {
         const reviewUrl = new URL(
           `/studio/review/${result.request.id}`,
           url.webUrl || 'http://localhost:2323',
-        ).href
+        )
+        if (!configuredPasscode) {
+          reviewUrl.searchParams.set('passcode', passcode)
+        }
         await this.emailService.send({
           from: `"${seo.title || 'MARLIN.LOG'}" <${senderEmail}>`,
           to: input.reviewerEmail,
@@ -199,8 +202,10 @@ export class MarlinWorkflowService {
           text: [
             `请审阅：${project.title}`,
             `修订版本：v${result.revision.version}`,
-            `审阅地址：${reviewUrl}`,
-            '请使用站主另行提供的长期六位审批口令。',
+            `审阅地址：${reviewUrl.href}`,
+            configuredPasscode
+              ? '请使用站主另行提供的长期六位审批口令。'
+              : '这是一次性审核链接，打开后会自动验证；请勿转发。',
             `有效期至：${result.request.expiresAt.toISOString()}`,
             '审阅通过不会自动发布，最终发布仍由站点所有者确认。',
           ].join('\n'),
